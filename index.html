@@ -1,0 +1,1151 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>あさのフィルム</title>
+<meta name="theme-color" content="#F1F1EE" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#121214" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="あさのフィルム">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-180.png">
+<style>
+/* Layout: 1画面アプリ。上=今月のコンタクトシート（フィルム）、下=タブ（フィルム / 撮る / 気圧） */
+:root{
+  --paper:#F1F1EE; --surface:#FFFFFF; --ink:#16171B; --muted:#6B6B70; --line:#D6D6D1;
+  --red:#C2452D; --red-ink:#FFFFFF; --film:#141416; --frame:#2A2A2E; --hole:#F1F1EE; --label:#F6C9A0;
+  --calm:#3F7D6B; --warn:#C9811A; --alert:#C2452D; --sun:#E0A21B; --rain:#4F7FBF; --cloudc:#A3A3A8;
+  --sans:"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic",system-ui,sans-serif;
+  --serif:"Hiragino Mincho ProN","Yu Mincho","Noto Serif JP",serif;
+  --sat:env(safe-area-inset-top,0px); --sab:env(safe-area-inset-bottom,0px);
+  --sal:env(safe-area-inset-left,0px); --sar:env(safe-area-inset-right,0px);
+}
+@media (prefers-color-scheme:dark){:root{
+  --paper:#121214; --surface:#1C1C1F; --ink:#EDEDE8; --muted:#9A9A9F; --line:#2E2E33;
+  --red:#E0644A; --red-ink:#121214; --film:#000; --frame:#1F1F23; --hole:#3A3A40; --label:#F6C9A0;
+  --calm:#6FB8A2; --warn:#E6A84A; --alert:#F07A62; --sun:#F2BE4A; --rain:#7FA8E0; --cloudc:#8A8A90; color-scheme:dark}}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased;overscroll-behavior:none}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;border:0;background:none;padding:0}
+:focus-visible{outline:2px solid var(--red);outline-offset:2px}
+[hidden]{display:none!important}
+.num{font-variant-numeric:tabular-nums}
+
+.app{height:100%;display:flex;flex-direction:column;max-width:520px;margin:0 auto}
+main{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-top:calc(var(--sat) + 14px);padding-bottom:24px}
+.pad{padding-left:max(20px,var(--sal));padding-right:max(20px,var(--sar))}
+
+/* tab bar */
+.tabbar{flex:none;position:relative;z-index:5;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;border-top:1px solid var(--line);background:var(--paper);
+  padding:10px max(24px,var(--sal)) calc(10px + var(--sab)) max(24px,var(--sar))}
+.tab{display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11px;color:var(--muted);padding:4px 0;letter-spacing:.06em}
+.tab i{width:6px;height:6px;border-radius:50%;background:currentColor;opacity:0}
+.tab.on{color:var(--ink);font-weight:700}.tab.on i{opacity:1;background:var(--red)}
+.shoot{width:58px;height:58px;flex:none;border-radius:50%;background:var(--red);box-shadow:0 2px 8px rgba(194,69,45,.28);display:grid;place-items:center}
+.shoot:active{transform:scale(.95)}
+.shoot span{width:24px;height:24px;border-radius:50%;border:3px solid var(--red-ink)}
+
+/* film view */
+.mast{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.roll{font-size:10px;letter-spacing:.24em;color:var(--red);font-weight:700}
+.mast h1{margin:4px 0 0;font-family:var(--serif);font-weight:600;font-size:30px;letter-spacing:.05em;line-height:1.2}
+.sub{margin:4px 0 0;font-size:12px;color:var(--muted)}
+.icon-btn{width:38px;height:38px;border-radius:50%;border:1px solid var(--line);display:grid;place-items:center;flex:none;background:var(--surface)}
+.icon-btn svg{width:18px;height:18px}
+.month-nav{display:flex;gap:6px;align-items:center;margin-top:12px}
+.month-nav button{font-size:12px;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:4px 12px}
+.month-nav button:disabled{opacity:.35}
+.wx-chip{margin-left:auto;font-size:12px;display:flex;align-items:center;gap:6px;border-radius:999px;padding:4px 10px;background:var(--surface);border:1px solid var(--line)}
+.dot{width:8px;height:8px;border-radius:50%;flex:none}
+
+.strip{margin-top:16px;background:var(--film);padding:16px max(12px,var(--sal)) 16px max(12px,var(--sar));position:relative}
+.strip::before,.strip::after{content:"";position:absolute;left:10px;right:10px;height:5px;background:repeating-linear-gradient(90deg,var(--hole) 0 8px,transparent 8px 17px)}
+.strip::before{top:5px}.strip::after{bottom:5px}
+.frames{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.daystrip{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:3px;margin-bottom:12px}
+.dc{position:relative;height:24px;border-radius:3px;background:#26262a;color:#808087;font-size:11px;display:flex;align-items:center;justify-content:center;font-variant-numeric:tabular-nums}
+.dc.on{background:var(--label);color:#3a2a1a;font-weight:700}
+.dc.now{outline:1.5px solid var(--red);outline-offset:-1.5px;color:#fff}
+.dc.on.now{color:#3a2a1a}
+.dc.fut{opacity:.35}
+.dc .ev{top:2px;right:2px;bottom:auto;width:5px;height:5px;box-shadow:none}
+.strip-empty{margin:0;color:#808087;font-size:12px;text-align:center;padding:10px 0}
+.fr{position:relative;aspect-ratio:3/4;background:var(--frame);overflow:hidden;display:block;width:100%}
+.fr img{width:100%;height:100%;object-fit:cover;filter:grayscale(1) contrast(1.05);display:block}
+.fr small{position:absolute;bottom:2px;left:4px;font-size:9px;color:var(--label);letter-spacing:.05em;white-space:nowrap;text-shadow:0 1px 2px #000}
+.fr.today{outline:2px solid var(--red);outline-offset:-2px}
+.fr.today img{filter:none}
+.fr.new{animation:arrive .9s ease-out both}
+@keyframes arrive{0%{transform:scale(.6);opacity:0;filter:brightness(2.2)}60%{transform:scale(1.06);opacity:1}100%{transform:none;filter:none}}
+.added{margin-top:14px;display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--ink);border-radius:16px;padding:10px 10px 10px 10px}
+.added img{width:46px;height:62px;object-fit:cover;border-radius:6px;flex:none}
+.added .t{flex:1;min-width:0;font-size:13px;line-height:1.5}
+.added .t b{display:block;font-size:14px}
+.added .btn{flex:none;padding:9px 14px;font-size:13px}
+.morning{margin-top:14px;display:flex;align-items:center;gap:12px;font-size:13px;line-height:1.5;padding:10px;border-radius:14px;background:var(--surface);border:1px solid var(--line)}
+.morning img{width:40px;height:54px;object-fit:cover;border-radius:6px;flex:none}
+.manual{display:flex;gap:8px;margin-top:10px}
+.manual input{flex:1;min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:16px}
+.fr.blank small{color:#77777d;text-shadow:none}
+.fr .ev{position:absolute;bottom:4px;right:4px;width:8px;height:8px;border-radius:2px;background:var(--alert);box-shadow:0 0 0 1.5px var(--film)}
+.fr.todo{display:grid;place-items:center;color:var(--label);font-size:11px}
+.fr.todo b{font-size:20px;line-height:1;font-weight:400}
+.fr.mood-grumpy::after,.fr.mood-sleepy::after{content:"";position:absolute;top:4px;right:4px;width:6px;height:6px;border-radius:50%}
+.fr.mood-sleepy::after{background:#9C8CE0}.fr.mood-grumpy::after{background:#E0644A}
+
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:18px}
+.stat{border-top:1px solid var(--ink);padding-top:6px}
+.stat b{display:block;font-family:var(--serif);font-size:24px;font-weight:600;line-height:1.3}
+.stat span{font-size:10px;color:var(--muted);letter-spacing:.06em}
+.play{margin-top:18px;width:100%;display:flex;align-items:center;justify-content:space-between;border:1px solid var(--ink);border-radius:999px;padding:9px 9px 9px 20px;font-size:14px;font-weight:700}
+.play i{width:36px;height:36px;border-radius:50%;background:var(--red);display:grid;place-items:center}
+.play i::before{content:"";border-left:11px solid var(--red-ink);border-top:7px solid transparent;border-bottom:7px solid transparent;margin-left:3px}
+.play:disabled{opacity:.4}
+.quote{margin:18px 0 0;font-family:var(--serif);font-size:15px;line-height:1.7}
+.quote span{display:block;font-family:var(--sans);font-size:10px;color:var(--muted);letter-spacing:.06em}
+.empty-note{margin-top:14px;font-size:13px;color:var(--muted);line-height:1.7}
+
+/* pressure view */
+.eyebrow{font-size:10px;letter-spacing:.24em;color:var(--red);font-weight:700}
+.wx-head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;margin-top:6px}
+.wx-now{font-family:var(--serif);font-size:46px;font-weight:600;line-height:1}
+.wx-now small{font-family:var(--sans);font-size:14px;color:var(--muted);margin-left:4px;font-weight:400}
+.trend{font-size:13px;color:var(--muted);text-align:right}
+.level{margin-top:14px;border-radius:16px;padding:14px 16px;display:flex;gap:12px;align-items:flex-start;background:var(--surface);border:1px solid var(--line)}
+.level .badge{flex:none;font-size:12px;font-weight:700;color:#fff;border-radius:999px;padding:3px 10px}
+.level p{margin:0;font-size:13.5px;line-height:1.7}
+.chart{margin-top:16px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:12px 10px 6px}
+.chart svg{display:block;width:100%;height:auto}
+.legend{display:flex;gap:14px;font-size:11px;color:var(--muted);padding:2px 6px 4px;flex-wrap:wrap}
+.legend span{display:flex;align-items:center;gap:5px;white-space:nowrap}
+.sec-title{margin:26px 0 10px;font-family:var(--serif);font-size:18px;font-weight:600}
+.place-btn{margin-top:12px;width:100%;display:flex;align-items:center;gap:6px;flex-wrap:wrap;border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:9px 12px;font-size:13.5px;text-align:left}
+.place-btn .hint:last-child{margin-left:auto}
+.meter{display:inline-flex;gap:3px;vertical-align:middle}
+.meter i{width:9px;height:9px;border-radius:50%;background:var(--line);display:block}
+.meter.big i{width:14px;height:14px}
+.lv-line{display:flex;align-items:center;gap:8px}
+.today-lv{margin-top:14px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px 16px;display:flex;flex-direction:column;gap:8px}
+.today-lv .label{font-size:11px;color:var(--muted);letter-spacing:.06em}
+.today-lv .lv-line b{font-size:18px;font-family:var(--serif)}
+.warn-line{margin:0;font-size:13px;color:var(--alert);font-weight:700}
+.kinds{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.kinds button{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:5px 12px;font-size:12.5px}
+.kinds button.on{background:var(--ink);color:var(--paper);border-color:var(--ink);font-weight:700}
+.rel{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.rel-verdict{margin:0;font-family:var(--serif);font-size:17px;font-weight:600;line-height:1.5;padding-left:10px;border-left:4px solid var(--c)}
+.rel-rows{display:flex;flex-direction:column;gap:8px}
+.rel-row{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 8px;align-items:center;font-size:12.5px}
+.rel-bar{grid-column:1/-1;height:8px;border-radius:4px;background:var(--line);overflow:hidden;display:block}
+.rel-bar i{display:block;height:100%;background:var(--ink);border-radius:4px}
+.rel-n{grid-column:1/-1;font-size:11.5px;color:var(--muted);margin-top:-2px}
+.tl-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
+.today-lv .wx-line{margin-top:0;align-items:flex-start}
+.today-lv .wx-line b{white-space:nowrap;flex:none}
+.today-lv .wx-line .wxi{flex:none;margin-top:1px}
+.today-lv .wx-line .t{min-width:0}
+.ampm-line,.ampm{display:block;font-size:13px;color:var(--muted)}
+.ampm-line{border-top:1px solid var(--line);padding-top:10px}
+.ampm-line b,.ampm b{color:var(--ink);font-size:15px}
+.ampm-s b{color:var(--ink);font-weight:700}
+.down{color:var(--alert);margin-left:2px}.up{color:var(--calm);margin-left:2px}
+.rel-wait{margin:0;font-size:13.5px;color:var(--muted);background:var(--surface);border:1px dashed var(--line);border-radius:12px;padding:10px 14px}
+.rel-wait b{color:var(--ink)}
+.chart-box{margin-top:22px}
+.chart-box summary{cursor:pointer;font-size:13.5px;font-weight:700;padding:10px 14px;border:1px solid var(--line);border-radius:12px;background:var(--surface);list-style:none;display:flex;justify-content:space-between}
+.chart-box summary::-webkit-details-marker{display:none}
+.chart-box summary::after{content:"開く ›";font-weight:400;color:var(--muted)}
+.chart-box[open] summary::after{content:"閉じる";}
+.chart-box .chart{margin-top:8px}
+.status-card{margin-top:14px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.status-card p{margin:0}
+.pl-list{display:flex;flex-direction:column;gap:6px}
+.pl-item{display:flex;align-items:baseline;gap:8px;border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:10px 12px;text-align:left;font-size:14px}
+.ev-btns{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.ev-btns button{border:1px solid var(--line);background:var(--surface);border-radius:14px;padding:10px 4px;font-size:12.5px;font-weight:700;display:flex;flex-direction:column;align-items:center;gap:5px;line-height:1.3;text-align:center}
+.ev-btns button .box{width:18px;height:18px;border-radius:5px;border:2px solid var(--line);display:grid;place-items:center}
+.ev-btns button.on{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
+.ev-btns button.on .box{border-color:transparent;background:var(--c)}
+.ev-btns button.on .box::after{content:"";width:8px;height:4px;border-left:2px solid #fff;border-bottom:2px solid #fff;transform:rotate(-45deg) translate(1px,-1px)}
+.wx-line{display:flex;align-items:center;gap:8px;font-size:14px;margin-top:6px}
+.wx-line .t{color:var(--muted);font-size:13px}
+.daycard{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:6px}
+.daycard .row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13.5px}
+.daycard svg[role=img]{width:100%;height:auto;display:block}
+.evchip{display:inline-flex;align-items:center;gap:4px;border-radius:999px;padding:1px 8px;font-size:11px;font-weight:700;color:#fff}
+.day{width:100%;text-align:left}
+.day .r{display:flex;flex-direction:column;align-items:flex-end;gap:3px}
+.days{display:flex;flex-direction:column}
+.day{display:grid;grid-template-columns:62px minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line);font-size:13px}
+.day .d{font-weight:700}
+.day>span:nth-child(2){display:flex;flex-direction:column;gap:4px;min-width:0}
+.day .bar{display:block;height:8px;border-radius:4px;background:var(--line);position:relative;overflow:hidden}
+.day .bar i{position:absolute;top:0;bottom:0;border-radius:4px}
+.day .r{font-size:12px;color:var(--muted);text-align:right;white-space:nowrap}
+.pill{display:inline-block;border-radius:999px;padding:1px 8px;font-size:11px;font-weight:700;margin-left:6px}
+.setup{margin-top:14px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:10px}
+.setup p{margin:0;font-size:13.5px}
+.credit{margin-top:22px;font-size:11px;color:var(--muted)}
+.credit a{color:inherit}
+
+/* buttons / forms */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:1px solid var(--ink);border-radius:999px;padding:10px 18px;font-weight:700;font-size:14px;background:transparent}
+.btn.fill{background:var(--red);border-color:var(--red);color:var(--red-ink)}
+.btn.block{width:100%}
+.btn.quiet{border-color:var(--line);font-weight:500}
+.btn.danger{background:var(--alert);border-color:var(--alert);color:#fff}
+.field{display:flex;flex-direction:column;gap:4px}
+.field label{font-size:11px;color:var(--muted);letter-spacing:.06em}
+.field input,.field select,.field textarea{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px;width:100%;font-size:16px}
+.row2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+
+/* sheets */
+.sheet-wrap{position:fixed;inset:0;z-index:40;background:rgba(10,10,12,.5);display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--paper);width:100%;max-width:520px;max-height:calc(100% - var(--sat) - 20px);overflow-y:auto;border-radius:22px 22px 0 0;
+  padding:18px max(20px,var(--sar)) calc(22px + var(--sab)) max(20px,var(--sal));display:flex;flex-direction:column;gap:14px}
+.sheet-head{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.sheet-head h2{margin:0;font-family:var(--serif);font-size:20px;font-weight:600}
+.close{font-size:14px;color:var(--muted);padding:6px 4px}
+.photo-big{width:100%;aspect-ratio:3/4;object-fit:cover;border-radius:14px;background:var(--frame);display:block;max-height:46vh;width:auto;max-width:100%;margin:0 auto}
+.moods{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.moods button{border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:8px 2px;font-size:12px;font-weight:700;display:flex;flex-direction:column;align-items:center;gap:4px}
+.moods button.on{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);border-radius:999px;padding:2px 10px;font-size:12px;background:var(--surface)}
+.confirm{background:var(--surface);border:1px solid var(--alert);border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:10px;font-size:13.5px}
+.actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.sticky-actions{position:sticky;bottom:calc(-22px - var(--sab));margin:0 calc(-1 * max(20px,var(--sar))) calc(-22px - var(--sab)) calc(-1 * max(20px,var(--sal)));padding:12px max(20px,var(--sar)) calc(14px + var(--sab)) max(20px,var(--sal));background:var(--paper);border-top:1px solid var(--line);z-index:2}
+@media (max-height:700px){.photo-big{max-height:32vh}}
+.err{color:var(--alert);font-size:13px;margin:0}
+.hint{font-size:12px;color:var(--muted);margin:0;line-height:1.7}
+
+/* camera */
+.cam{position:fixed;inset:0;z-index:50;background:#000;color:#fff;display:flex;flex-direction:column}
+.cam-top{display:flex;justify-content:space-between;align-items:center;padding:calc(var(--sat) + 10px) max(16px,var(--sar)) 10px max(16px,var(--sal));font-size:14px}
+.cam-top button{color:#fff;padding:6px 4px}
+.viewer{position:relative;flex:1;overflow:hidden;display:grid;place-items:center}
+.viewer .box{position:relative;width:min(100%, calc((100vh - 230px) * .75));aspect-ratio:3/4;max-width:100%;overflow:hidden;background:#111}
+.viewer video,.viewer .ghost{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.viewer video.mirror{transform:scaleX(-1)}
+.viewer .ghost{opacity:.32;pointer-events:none}
+.viewer .guide{position:absolute;left:50%;top:44%;width:56%;height:52%;transform:translate(-50%,-50%);border:2px dashed rgba(255,255,255,.7);border-radius:50%;pointer-events:none}
+.cam-msg{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:24px;text-align:center;font-size:14px;line-height:1.7}
+.cam-msg .btn{border-color:#fff;color:#fff}
+.cam-msg .btn.fill{background:var(--red);border-color:var(--red);color:#fff}
+.cam-bottom{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:16px max(24px,var(--sar)) calc(18px + var(--sab)) max(24px,var(--sal))}
+.cam-bottom .side{font-size:12px;color:#fff;display:flex;flex-direction:column;align-items:center;gap:4px;opacity:.9}
+.cam-bottom .side.on{color:var(--label)}
+.shutter{width:74px;height:74px;border-radius:50%;border:4px solid #fff;display:grid;place-items:center}
+.shutter i{width:58px;height:58px;border-radius:50%;background:#fff;transition:transform .1s}
+.shutter:active i{transform:scale(.9)}
+
+/* flipbook */
+.flip{position:fixed;inset:0;z-index:60;background:#0B0B0D;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:calc(var(--sat) + 16px) 16px calc(var(--sab) + 16px)}
+.flip img{width:min(86vw, 58vh);aspect-ratio:3/4;object-fit:cover;border-radius:6px}
+.flip .cap{font-family:var(--serif);font-size:20px}
+.flip .cap small{font-family:var(--sans);font-size:12px;opacity:.7;margin-left:8px}
+.flip .prog{width:min(86vw,58vh);height:2px;background:rgba(255,255,255,.2)}
+.flip .prog i{display:block;height:100%;background:var(--label);width:0}
+.flip .hint{color:rgba(255,255,255,.6)}
+.toast{position:fixed;left:50%;bottom:calc(var(--sab) + 100px);transform:translateX(-50%);background:var(--ink);color:var(--paper);font-size:13px;border-radius:999px;padding:8px 16px;z-index:70;white-space:nowrap}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <main id="main"></main>
+  <nav class="tabbar" aria-label="画面の切り替え">
+    <button class="tab" id="tabFilm" type="button">フィルム<i></i></button>
+    <button class="shoot" id="tabShoot" type="button" aria-label="けさの顔を撮る"><span></span></button>
+    <button class="tab" id="tabWx" type="button">気圧<i></i></button>
+  </nav>
+</div>
+
+<div id="layer"></div>
+<input type="file" id="fileCam" accept="image/*" capture="environment" hidden>
+<input type="file" id="fileLib" accept="image/*" hidden>
+<input type="file" id="fileBackup" accept="application/json,.json" hidden>
+
+<script>
+(() => {
+"use strict";
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const pad = n => String(n).padStart(2, "0");
+const ymd = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const parse = s => { const [y,m,d] = s.split("-").map(Number); return new Date(y, m-1, d); };
+const todayStr = () => ymd(new Date());
+const KANJI = ["一","二","三","四","五","六","七","八","九","十","十一","十二"];
+const WEEK = ["日","月","火","水","木","金","土"];
+const MOODS = [
+  { k:"sleepy", t:"ねむい",   c:"#9C8CE0" },
+  { k:"grumpy", t:"ふきげん", c:"#E0644A" },
+  { k:"plain",  t:"ふつう",   c:"#B9B9B2" },
+  { k:"happy",  t:"ごきげん", c:"#E8B940" },
+];
+// 娘のようす（その日にあったこと）
+const EVENTS = [
+  { k:"nurse",    t:"保健室に行った",   s:"保健室", c:"#4F7FBF" },
+  { k:"early",    t:"早退した",         s:"早退",   c:"#C9811A" },
+  { k:"headache", t:"帰ってから頭痛",   s:"頭痛",   c:"#C2452D" },
+];
+// 天気（Open-Meteo の天気コード → ことばとアイコン）
+function wxName(c){
+  if (c == null) return null;
+  if (c <= 1) return { t:"晴れ", i:"sun" };
+  if (c === 2) return { t:"晴れ時々くもり", i:"partly" };
+  if (c === 3) return { t:"くもり", i:"cloud" };
+  if (c === 45 || c === 48) return { t:"霧", i:"fog" };
+  if (c >= 95) return { t:"雷雨", i:"storm" };
+  if ((c >= 71 && c <= 77) || c === 85 || c === 86) return { t:"雪", i:"snow" };
+  if (c >= 80 && c <= 82) return { t:"にわか雨", i:"rain" };
+  if (c >= 51 && c <= 67) return { t:"雨", i:"rain" };
+  return { t:"くもり", i:"cloud" };
+}
+function wxIcon(i, size){
+  const s = size || 18, cl = `<path d="M7 18h10a4 4 0 0 0 .5-8 5.5 5.5 0 0 0-10.6 1.2A3.5 3.5 0 0 0 7 18z" fill="var(--cloudc)"/>`;
+  const body = {
+    sun: `<circle cx="12" cy="12" r="4.5" fill="var(--sun)"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8" stroke="var(--sun)" stroke-width="1.8" stroke-linecap="round"/>`,
+    partly: `<circle cx="9" cy="8" r="3.6" fill="var(--sun)"/><path d="M9 1.8v1.6M2.8 8h1.6M4.6 3.6l1.1 1.1M13.4 3.6l-1.1 1.1" stroke="var(--sun)" stroke-width="1.6" stroke-linecap="round"/>` + cl,
+    cloud: cl,
+    rain: cl + `<path d="M9 20l-1 2.5M13 20l-1 2.5M17 20l-1 2.5" stroke="var(--rain)" stroke-width="1.8" stroke-linecap="round"/>`,
+    snow: cl + `<circle cx="9" cy="21" r="1.1" fill="var(--rain)"/><circle cx="13" cy="22" r="1.1" fill="var(--rain)"/><circle cx="17" cy="21" r="1.1" fill="var(--rain)"/>`,
+    fog: `<path d="M4 9h16M6 13h12M4 17h16" stroke="var(--cloudc)" stroke-width="2" stroke-linecap="round"/>`,
+    storm: cl + `<path d="M12.5 17.5l-2 3.2h2.4l-1.4 2.8" stroke="var(--sun)" stroke-width="1.7" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`,
+  }[i] || cl;
+  return `<svg class="wxi" width="${s}" height="${s}" viewBox="0 0 24 24" aria-hidden="true">${body}</svg>`;
+}
+
+/* ---------- 保存（スマホの中） ---------- */
+const LS = {
+  get(k, d){ try { const v = localStorage.getItem("asa:" + k); return v ? JSON.parse(v) : d; } catch { return d; } },
+  set(k, v){ try { localStorage.setItem("asa:" + k, JSON.stringify(v)); } catch {} }
+};
+let DB = null;
+function openDB(){
+  return new Promise((res, rej) => {
+    const r = indexedDB.open("asa-film", 1);
+    r.onupgradeneeded = () => { const d = r.result; d.createObjectStore("entries", { keyPath:"date" }); d.createObjectStore("days", { keyPath:"date" }); };
+    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+  });
+}
+function tx(store, mode, fn){
+  return new Promise((res, rej) => {
+    const t = DB.transaction(store, mode), s = t.objectStore(store); let out;
+    const r = fn(s); if (r) r.onsuccess = () => { out = r.result; };
+    t.oncomplete = () => res(out); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error);
+  });
+}
+const getAll = s => tx(s, "readonly", st => st.getAll());
+const put = (s, v) => tx(s, "readwrite", st => st.put(v));
+const del = (s, k) => tx(s, "readwrite", st => st.delete(k));
+
+/* ---------- 状態 ---------- */
+const S = {
+  tab: "film",
+  entries: [],            // {date, photo:Blob, mood, note, createdAt}
+  days: {},               // date -> {date, series:[24], min, max, drop, wcode, tmax, tmin, kid:{nurse, early, headache, memo}}
+  urls: {},               // date -> objectURL
+  settings: LS.get("settings", { name:"", grade:3, gradeYear:null, place:null }),
+  wx: LS.get("wx", null), // 気圧の最新データ
+  wxErr: "",
+  view: (() => { const d = new Date(); return { y:d.getFullYear(), m:d.getMonth() }; })(),
+};
+if (!S.settings.gradeYear) { S.settings.gradeYear = schoolYear(new Date()); LS.set("settings", S.settings); }
+
+function schoolYear(d){ return d.getMonth() >= 3 ? d.getFullYear() : d.getFullYear() - 1; }
+function gradeAt(d){ return S.settings.grade + (schoolYear(d) - S.settings.gradeYear); }
+function gradeText(g){ return g <= 6 ? `小学${g}年生` : g <= 9 ? `中学${g-6}年生` : `高校${g-9}年生`; }
+const urlOf = e => S.urls[e.date] || (S.urls[e.date] = URL.createObjectURL(e.photo));
+const entryOf = date => S.entries.find(e => e.date === date);
+const kidOf = date => (S.days[date] && S.days[date].kid) || {};
+const hasEvent = date => { const k = kidOf(date); return !!(k.nurse || k.early || k.headache); };
+async function setKid(date, patch){
+  const d = S.days[date] || { date };
+  d.kid = { ...(d.kid || {}), ...patch };
+  S.days[date] = d; await put("days", d);
+}
+function addDays(dateStr, n){ const d = parse(dateStr); d.setDate(d.getDate() + n); return ymd(d); }
+function toast(t){ const el = document.createElement("div"); el.className = "toast"; el.textContent = t; document.body.appendChild(el); setTimeout(() => el.remove(), 2200); }
+
+/* ---------- 気圧 ---------- */
+function levelOf(drop){
+  if (drop >= 4) return { k:"alert", t:"注意", c:"var(--alert)" };
+  if (drop >= 3.2) return { k:"warn", t:"やや注意", c:"var(--warn)" };
+  return { k:"calm", t:"おだやか", c:"var(--calm)" };
+}
+function maxDrop(arr){ let m = 0; for (let i = 0; i + 3 < arr.length; i++) m = Math.max(m, arr[i] - arr[i+3]); return Math.round(m*10)/10; }
+
+// 天気サービスから JSON を取る。取れなかったときは、理由を日本語で返す
+async function getJSON(url, ms){
+  const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), ms);
+  try {
+    const r = await fetch(url, { signal: ctl.signal, cache: "no-store" });
+    if (!r.ok){ const e = new Error("http " + r.status); e.why = `天気サービスがエラーを返しました（${r.status}）`; throw e; }
+    return await r.json();
+  } catch (e){
+    if (e.why) throw e;
+    const x = new Error(e.name);
+    x.why = e.name === "AbortError" ? "時間内に返事がありませんでした（電波が弱いかもしれません）"
+          : navigator.onLine === false ? "スマホがインターネットにつながっていません"
+          : "天気サービスにつながりませんでした";
+    throw x;
+  } finally { clearTimeout(t); }
+}
+const wxURL = (p, past) => `https://api.open-meteo.com/v1/forecast?latitude=${p.lat}&longitude=${p.lon}&hourly=pressure_msl,weather_code,temperature_2m&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto&past_days=${past}&forecast_days=3`;
+function toWx(j, p){
+  return { at: Date.now(), lat:p.lat, lon:p.lon, time:j.hourly.time, hpa:j.hourly.pressure_msl,
+    code:j.hourly.weather_code || [], temp:j.hourly.temperature_2m || [],
+    daily: j.daily ? { time:j.daily.time, code:j.daily.weather_code, tmax:j.daily.temperature_2m_max, tmin:j.daily.temperature_2m_min } : null };
+}
+// 抜けている日までさかのぼる日数（最大92日）
+function neededPast(){
+  const today = todayStr(), daysAgo = ds => Math.round((parse(today) - parse(ds)) / 864e5);
+  const known = Object.values(S.days).filter(d => d.series && d.date < today).map(d => d.date).sort();
+  let past = known.length ? daysAgo(known[known.length - 1]) + 1 : 14;
+  const missing = S.entries.filter(e => !(S.days[e.date] && S.days[e.date].series)).map(e => daysAgo(e.date));
+  if (missing.length) past = Math.max(past, ...missing.map(n => n + 1));
+  return Math.min(92, Math.max(2, past));
+}
+/* ---------- 気象庁の観測データ（予備の取り方） ---------- */
+// 海外の天気サービスにつながらないときは、気圧を観測している近くの気象台の値を使う
+const JMA_ST = [["11016","稚内",45.41,141.68],["11291","北見枝幸",44.94,142.59],["12442","旭川",43.76,142.37],["13181","羽幌",44.36,141.70],["13277","留萌",43.95,141.63],["14163","札幌",43.06,141.33],["15356","岩見沢",43.21,141.78],["16091","小樽",43.18,141.01],["16217","倶知安",42.90,140.76],["16252","寿都",42.80,140.22],["17036","雄武",44.58,142.96],["17112","紋別",44.34,143.35],["17341","網走",44.02,144.28],["18273","根室",43.33,145.59],["19432","釧路",42.98,144.38],["20432","帯広",42.92,143.21],["20751","広尾",42.29,143.32],["21187","苫小牧",42.62,141.55],["21323","室蘭",42.31,140.97],["22327","浦河",42.16,142.78],["23232","函館",41.82,140.75],["24217","江差",41.87,140.12],["31111","むつ",41.28,141.21],["31312","青森",40.82,140.77],["31436","深浦",40.65,139.93],["31602","八戸",40.53,141.52],["32402","秋田",39.72,140.10],["33431","盛岡",39.70,141.16],["33472","宮古",39.65,141.97],["33877","大船渡",39.06,141.71],["34292","石巻",38.43,141.30],["34392","仙台",38.26,140.90],["35052","酒田",38.91,139.84],["35162","新庄",38.76,140.31],["35426","山形",38.26,140.34],["36127","福島",37.76,140.47],["36361","若松",37.49,139.91],["36667","白河",37.13,140.22],["36846","小名浜",36.95,140.90],["40201","水戸",36.38,140.47],["40336","つくば",36.06,140.12],["41277","宇都宮",36.55,139.87],["42251","前橋",36.41,139.06],["43056","熊谷",36.15,139.38],["43156","秩父",35.99,139.07],["44132","東京",35.69,139.75],["44172","大島",34.75,139.36],["44226","三宅島",34.12,139.52],["44263","八丈島",33.12,139.78],["44301","父島",27.09,142.19],["44356","南鳥島",24.29,153.98],["45148","銚子",35.74,140.86],["45212","千葉",35.60,140.10],["45371","勝浦",35.15,140.31],["45401","館山",34.99,139.87],["46106","横浜",35.44,139.65],["48156","長野",36.66,138.19],["48361","松本",36.25,137.97],["48491","諏訪",36.05,138.11],["48767","飯田",35.52,137.82],["49142","甲府",35.67,138.55],["50206","三島",35.11,138.93],["50281","網代",35.05,139.09],["50331","静岡",34.98,138.40],["50456","浜松",34.75,137.71],["50551","御前崎",34.60,138.21],["50561","石廊崎",34.60,138.84],["51106","名古屋",35.17,136.97],["51346","伊良湖",34.63,137.09],["52146","高山",36.16,137.25],["52586","岐阜",35.40,136.76],["53061","四日市",34.94,136.58],["53112","上野",34.76,136.14],["53133","津",34.73,136.52],["53378","尾鷲",34.07,136.19],["54157","相川",38.03,138.24],["54232","新潟",37.89,139.02],["54651","高田",37.11,138.25],["55091","伏木",36.79,137.06],["55102","富山",36.71,137.20],["56052","輪島",37.39,136.90],["56227","金沢",36.59,136.63],["57066","福井",36.05,136.22],["57248","敦賀",35.65,136.06],["60131","彦根",35.27,136.24],["61111","舞鶴",35.45,135.32],["61286","京都",35.01,135.73],["62078","大阪",34.68,135.52],["63051","豊岡",35.53,134.82],["63383","姫路",34.84,134.67],["63518","神戸",34.70,135.21],["63571","洲本",34.31,134.85],["64036","奈良",34.67,135.84],["65042","和歌山",34.23,135.16],["65356","潮岬",33.45,135.76],["66186","津山",35.06,134.01],["66408","岡山",34.69,133.93],["67401","福山",34.45,133.25],["67437","広島",34.40,132.46],["67511","呉",34.24,132.55],["68022","西郷",36.20,133.33],["68132","松江",35.46,133.06],["68376","浜田",34.90,132.07],["69006","境",35.54,133.24],["69076","米子",35.43,133.34],["69122","鳥取",35.49,134.24],["71106","徳島",34.07,134.57],["72086","高松",34.32,134.05],["72111","多度津",34.27,133.75],["73166","松山",33.84,132.78],["73442","宇和島",33.23,132.55],["74182","高知",33.57,133.55],["74372","室戸岬",33.25,134.18],["74447","宿毛",32.91,132.72],["74516","清水",32.72,133.01],["81071","萩",34.41,131.41],["81286","山口",34.16,131.46],["81428","下関",33.95,130.93],["82136","飯塚",33.65,130.69],["82182","福岡",33.58,130.38],["83137","日田",33.32,130.93],["83216","大分",33.23,131.62],["84072","厳原",34.20,129.29],["84171","平戸",33.36,129.55],["84266","佐世保",33.16,129.73],["84496","長崎",32.73,129.87],["84519","雲仙岳",32.74,130.26],["84536","福江",32.69,128.83],["85142","佐賀",33.27,130.31],["86141","熊本",32.81,130.71],["86467","人吉",32.22,130.75],["86491","牛深",32.20,130.03],["87141","延岡",32.58,131.66],["87376","宮崎",31.94,131.41],["87426","都城",31.73,131.08],["87492","油津",31.58,131.41],["88061","阿久根",32.03,130.20],["88317","鹿児島",31.55,130.55],["88466","枕崎",31.27,130.29],["88612","種子島",30.72,130.98],["88686","屋久島",30.39,130.66],["88837","名瀬",28.39,129.49],["88971","沖永良部",27.43,128.71],["91107","名護",26.59,127.97],["91146","久米島",26.34,126.80],["91197","那覇",26.21,127.69],["92011","南大東",25.83,131.23],["93041","宮古島",24.79,125.28],["94017","与那国島",24.47,123.01],["94062","西表島",24.43,123.77],["94081","石垣島",24.34,124.16]];
+function nearestStation(p){
+  let best = null, bd = 1e9;
+  for (const s of JMA_ST){ const d = (s[2] - p.lat) ** 2 + ((s[3] - p.lon) * Math.cos(p.lat * Math.PI / 180)) ** 2; if (d < bd){ bd = d; best = s; } }
+  return { id: best[0], name: best[1], km: Math.round(Math.sqrt(bd) * 111) };
+}
+// 気象庁の天気番号 → 天気コード（Open-Meteo と同じ番号）
+function jmaToWmo(c){
+  if (c == null) return null;
+  return ({ 0:0, 1:3, 2:45, 3:45, 4:61, 5:51, 6:80, 7:61, 8:71, 9:71, 10:71, 11:71, 12:95, 13:85 })[c] ?? null;
+}
+const sev = c => c == null ? -1 : c >= 95 ? 9 : (c >= 71 && c <= 86 && c !== 80 && c !== 81 && c !== 82) ? 8 : (c >= 51) ? 7 : c >= 45 ? 4 : c;
+async function fetchJMA(p, days){
+  const st = nearestStation(p), now = new Date(), blocks = [];
+  for (let i = days - 1; i >= 0; i--){
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i), key = `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}`;
+    for (let h = 0; h < 24; h += 3){ if (i === 0 && h > now.getHours()) break; blocks.push(`${key}_${pad(h)}`); }
+  }
+  const got = {};
+  let idx = 0;
+  const worker = async () => { while (idx < blocks.length){ const b = blocks[idx++];
+    try { Object.assign(got, await getJSON(`https://www.jma.go.jp/bosai/amedas/data/point/${st.id}/${b}.json`, 15000)); } catch {} } };
+  await Promise.all(Array.from({ length: 6 }, worker));
+  const hours = Object.keys(got).filter(k => k.slice(10, 12) === "00").sort();
+  if (!hours.length){ const e = new Error("jma"); e.why = "気象庁の観測データも取れませんでした"; throw e; }
+  const time = [], hpa = [], code = [], temp = [];
+  for (const k of hours){
+    const v = got[k], np = v.normalPressure && v.normalPressure[0];
+    time.push(`${k.slice(0,4)}-${k.slice(4,6)}-${k.slice(6,8)}T${k.slice(8,10)}:00`);
+    hpa.push(np == null ? null : np);
+    code.push(jmaToWmo(v.weather && v.weather[0]));
+    temp.push(v.temp ? v.temp[0] : null);
+  }
+  const dt = [...new Set(time.map(t => t.slice(0, 10)))], dc = [], tx = [], tn = [];
+  for (const d of dt){
+    const ix = time.map((t, i) => t.startsWith(d) ? i : -1).filter(i => i >= 0);
+    const cs = ix.map(i => code[i]).filter(c => c != null), ts = ix.map(i => temp[i]).filter(t => t != null);
+    dc.push(cs.length ? cs.reduce((a, b) => sev(b) > sev(a) ? b : a) : null);
+    tx.push(ts.length ? Math.max(...ts) : null); tn.push(ts.length ? Math.min(...ts) : null);
+  }
+  return { at: Date.now(), lat:p.lat, lon:p.lon, time, hpa, code, temp, daily:{ time:dt, code:dc, tmax:tx, tmin:tn },
+    src:"jma", station: st.name, km: st.km };
+}
+
+async function fetchWx(force){
+  const p = S.settings.place; if (!p) return;
+  const fresh = S.wx && S.wx.lat === p.lat && S.wx.lon === p.lon && Date.now() - S.wx.at < 30*60*1000;
+  if (fresh && !force) return;
+  if (S.wxBusy && !force) return;
+  S.wxBusy = true; clearTimeout(S.retryT);
+  try {
+    // 1) まず今日まわりだけを軽く取って、すぐ表示する（1時間以内につながらなかったら、すぐ気象庁へ）
+    let j = null, omErr = null;
+    if (!(S.omDownAt && Date.now() - S.omDownAt < 60*60*1000)){
+      try { j = await getJSON(wxURL(p, 2), 9000); S.omDownAt = 0; } catch (e) { omErr = e; S.omDownAt = Date.now(); }
+    }
+    if (!j){
+      // 予備：気象庁の観測データ（予報はないが、気圧・天気・気温の実際の値が入る）
+      try { S.wx = await fetchJMA(p, Math.min(neededPast(), 14)); }
+      catch (e2) { const e = new Error("both"); e.why = `${omErr ? omErr.why + "。" : ""}${e2.why || "気象庁の観測データも取れませんでした"}`; throw e; }
+      LS.set("wx", S.wx); S.wxErr = ""; S.wxFails = 0;
+      try { await saveDays(); } catch {}
+      S.wxBusy = false; render(); return;
+    }
+    const past = neededPast();
+    S.wx = toWx(j, p); LS.set("wx", S.wx); S.wxErr = ""; S.wxFails = 0;
+    try { await saveDays(); } catch (e) { S.wxErr = "取った天気の保存でつまずきました。もう一度取ると直ることがあります。"; }
+    S.wxBusy = false; render();
+    // 2) 抜けている日があれば、あとからまとめて取る（失敗しても今日の表示はそのまま）
+    if (past > 2){
+      try { const j2 = await getJSON(wxURL(p, past), 40000); S.wx = toWx(j2, p); LS.set("wx", S.wx); await saveDays(); render(); } catch {}
+    }
+  } catch (e) {
+    S.wxFails = (S.wxFails || 0) + 1;
+    const wait = [10, 30, 120][Math.min(S.wxFails - 1, 2)];
+    S.wxErr = `${e.why || "天気と気圧を取れませんでした"}。${wait < 60 ? wait + "秒" : wait / 60 + "分"}後に自動でもう一度取ります。`;
+    S.retryT = setTimeout(() => fetchWx(true), wait * 1000);
+    S.wxBusy = false; render();
+  }
+}
+// 取ったデータから「その日の気圧」を日ごとに保存しておく（14日前までさかのぼって毎回うめる）
+async function saveDays(){
+  const by = {};
+  S.wx.time.forEach((t, i) => { const d = t.slice(0,10), v = S.wx.hpa[i]; if (v == null) return; (by[d] = by[d] || []).push(v); });
+  const today = todayStr();
+  for (const d of Object.keys(by)){
+    if (d > today) continue;
+    const s = by[d]; if (s.length < (d === today ? 3 : 20)) continue;
+    const old = S.days[d] || { date:d };
+    const rec = { ...old, date:d, series:s.map(v => Math.round(v*10)/10), min:Math.min(...s), max:Math.max(...s), drop:maxDrop(s) };
+    const dl = S.wx.daily, k = dl ? dl.time.indexOf(d) : -1;
+    if (k >= 0){ rec.wcode = dl.code[k]; rec.tmax = dl.tmax[k]; rec.tmin = dl.tmin[k]; }
+    S.days[d] = rec; await put("days", rec);
+  }
+}
+// 午前（0〜11時）と午後（12〜23時）の平均の気圧
+function amPm(series){
+  if (!series || !series.length) return null;
+  const avg = a => a.length ? Math.round(a.reduce((x, y) => x + y, 0) / a.length) : null;
+  return { am: avg(series.slice(0, 12)), pm: avg(series.slice(12)) };
+}
+function amPmHTML(series, cls){
+  const ap = amPm(series); if (!ap || ap.am == null) return "";
+  const diff = ap.pm != null ? ap.pm - ap.am : null;
+  return `<span class="${cls || "ampm"} num">午前 <b>${ap.am}</b>${ap.pm != null ? ` → 午後 <b>${ap.pm}</b>` : ""} hPa${diff ? `<span class="${diff < 0 ? "down" : "up"}">（${diff > 0 ? "+" : "−"}${Math.abs(diff)}）</span>` : ""}</span>`;
+}
+// 今の天気（1時間ごとの天気コードと気温）
+function wxNow(){
+  const i = wxNowIndex(); if (i < 0 || !S.wx.code || S.wx.code[i] == null) return null;
+  return { w: wxName(S.wx.code[i]), temp: S.wx.temp && S.wx.temp[i] != null ? Math.round(S.wx.temp[i]) : null };
+}
+// 1日ぶんの気圧の小さなグラフ（0〜23時）
+function sparkSVG(series){
+  if (!series || series.length < 4) return "";
+  const W = 300, H = 74, L = 30, R = 6, T = 8, B = 18;
+  let lo = Math.min(...series), hi = Math.max(...series);
+  if (hi - lo < 4){ const m = (hi + lo) / 2; lo = m - 2; hi = m + 2; }
+  const xs = i => L + i / 23 * (W - L - R), ys = v => T + (1 - (v - lo) / (hi - lo)) * (H - T - B);
+  let bands = "";
+  for (let i = 0; i + 3 < series.length; i++){ const d = series[i] - series[i+3]; if (d >= 2.4) bands += `<rect x="${xs(i)}" y="${T}" width="${xs(i+3)-xs(i)}" height="${H-T-B}" fill="${d >= 3.2 ? "var(--alert)" : "var(--warn)"}" opacity=".12"/>`; }
+  const path = series.map((v,i) => (i ? "L" : "M") + xs(i).toFixed(1) + " " + ys(v).toFixed(1)).join(" ");
+  const ticks = [0,6,12,18].map(h => `<text x="${xs(h)}" y="${H-4}" font-size="10" fill="var(--muted)" text-anchor="${h ? "middle" : "start"}">${h}時</text>`).join("");
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="この日の気圧の移り変わり">${bands}
+    <line x1="${L}" x2="${W-R}" y1="${ys(hi)}" y2="${ys(hi)}" stroke="var(--line)"/><line x1="${L}" x2="${W-R}" y1="${ys(lo)}" y2="${ys(lo)}" stroke="var(--line)"/>
+    <text x="${L-4}" y="${ys(hi)+4}" font-size="10" text-anchor="end" fill="var(--muted)">${Math.round(hi)}</text>
+    <text x="${L-4}" y="${ys(lo)+4}" font-size="10" text-anchor="end" fill="var(--muted)">${Math.round(lo)}</text>
+    <path d="${path}" fill="none" stroke="var(--ink)" stroke-width="2" stroke-linejoin="round"/>${ticks}</svg>`;
+}
+function wxNowIndex(){
+  if (!S.wx) return -1;
+  const now = new Date(), key = `${ymd(now)}T${pad(now.getHours())}:00`;
+  const i = S.wx.time.indexOf(key);
+  if (i >= 0 && S.wx.hpa[i] != null) return i;
+  for (let k = S.wx.time.length - 1; k >= 0; k--) if (S.wx.time[k] <= key && S.wx.hpa[k] != null && S.wx.time[k].slice(0,10) === key.slice(0,10)) return k;
+  return -1;
+}
+function hpaAt(dateStr, hour){
+  if (!S.wx) return null;
+  const i = S.wx.time.indexOf(`${dateStr}T${pad(hour)}:00`);
+  return i >= 0 && S.wx.hpa[i] != null ? Math.round(S.wx.hpa[i]) : null;
+}
+function wxSummary(){
+  const i = wxNowIndex(); if (i < 0) return null;
+  const h = S.wx.hpa, now = h[i], ago = h[i-3];
+  const next = h.slice(i, i + 13).filter(v => v != null);
+  const drop = maxDrop(next);
+  let when = null;
+  for (let k = i; k + 3 < Math.min(h.length, i + 13); k++) if (h[k] - h[k+3] >= 3.2) { when = new Date(S.wx.time[k]).getHours(); break; }
+  return { now, delta: ago != null ? Math.round((now - ago)*10)/10 : null, drop, when, lv: levelOf(drop) };
+}
+
+/* ---------- 画面: フィルム ---------- */
+function renderFilm(){
+  const { y, m } = S.view, now = new Date(), today = todayStr();
+  const isThisMonth = y === now.getFullYear() && m === now.getMonth();
+  const first = new Date(y, m, 1), last = new Date(y, m + 1, 0).getDate();
+  const g = gradeAt(new Date(y, m, 15));
+  const total = S.entries.length;
+  const monthEntries = S.entries.filter(e => e.date.startsWith(`${y}-${pad(m+1)}`));
+  const name = S.settings.name;
+  const sub = isThisMonth
+    ? (total ? `撮りはじめてから、${total}回目の朝` : `今日から、毎朝の顔を残していきます`) + (name ? "　" + esc(name) : "")
+    : `この月は ${monthEntries.length} 回の朝を撮りました`;
+
+  // 上：1か月の日付（写真のある日は明るく）／下：写真のある日だけのコマ（新しい順・横に4枚）
+  const upto = isThisMonth ? now.getDate() : last;
+  let dayStrip = "";
+  for (let d = 1; d <= last; d++){
+    const ds = `${y}-${pad(m+1)}-${pad(d)}`, e = entryOf(ds), fut = d > upto;
+    const ev = hasEvent(ds) ? `<i class="ev"></i>` : "";
+    dayStrip += fut ? `<span class="dc fut">${d}</span>`
+      : `<button type="button" class="dc ${e ? "on" : ""} ${ds === today ? "now" : ""}" data-open="${ds}" aria-label="${m+1}月${d}日${e ? "（写真あり）" : ""}">${d}${ev}</button>`;
+  }
+  let frames = "";
+  if (isThisMonth && !entryOf(today)) frames += `<button type="button" class="fr todo today" data-shoot><span><b>＋</b><br>けさの顔</span><small>TODAY</small>${hasEvent(today) ? `<i class="ev"></i>` : ""}</button>`;
+  [...monthEntries].sort((a,b) => a.date < b.date ? 1 : -1).forEach(e => {
+    const dd = parse(e.date), isToday = e.date === today, ev = hasEvent(e.date) ? `<i class="ev" title="保健室・早退・頭痛の記録あり"></i>` : "";
+    frames += `<button type="button" class="fr ${isToday ? "today" : ""} ${e.date === S.justAdded ? "new" : ""} mood-${e.mood}" data-open="${e.date}"><img src="${urlOf(e)}" alt="${dd.getMonth()+1}月${dd.getDate()}日の顔"><small>${isToday ? "TODAY" : `${pad(dd.getMonth()+1)}.${pad(dd.getDate())}`}</small>${ev}</button>`;
+  });
+  const count = (isThisMonth && !entryOf(today) ? 1 : 0) + monthEntries.length;
+  const slots = Math.max(12, Math.ceil(count / 4) * 4); for (let k = count; k < slots; k++) frames += `<div class="fr blank"></div>`;
+
+  let evDays = 0; for (let d = 1; d <= upto; d++) if (hasEvent(`${y}-${pad(m+1)}-${pad(d)}`)) evDays++;
+  const sleepy = monthEntries.length ? Math.round(monthEntries.filter(e => e.mood === "sleepy" || e.mood === "grumpy").length / monthEntries.length * 100) : null;
+  const lastNote = [...monthEntries].reverse().find(e => e.note);
+  const sum = wxSummary();
+  const minMonth = S.entries.length ? parse(S.entries[0].date) : now;
+  const canPrev = y > minMonth.getFullYear() || (y === minMonth.getFullYear() && m > minMonth.getMonth());
+
+  $("main").innerHTML = `<div class="pad">
+      <div class="mast">
+        <div>
+          <div class="roll">ROLL ${pad(Math.max(g,0))} ・ ${gradeText(g)}</div>
+          <h1>${KANJI[m]}月の朝</h1>
+          <p class="sub num">${y}年 ・ ${sub}</p>
+        </div>
+        <button class="icon-btn" type="button" id="btnSettings" aria-label="設定"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg></button>
+      </div>
+      <div class="month-nav">
+        <button type="button" id="mPrev" ${canPrev ? "" : "disabled"}>‹ 前の月</button>
+        <button type="button" id="mNext" ${isThisMonth ? "disabled" : ""}>次の月 ›</button>
+        ${(() => { const lt = dayLevel((S.days[today] || {}).series);
+          if (!S.settings.place) return `<button type="button" class="wx-chip" id="wxChip"><span class="dot" style="background:var(--line)"></span>場所を選んで天気を見る</button>`;
+          return lt ? `<button type="button" class="wx-chip num" id="wxChip">${meter(lt)}<span>${lt.t}</span></button>`
+                    : `<button type="button" class="wx-chip" id="wxChip"><span class="dot" style="background:var(--line)"></span>天気と気圧を見る</button>`; })()}
+      </div>
+      ${S.justAdded && entryOf(S.justAdded) ? `<div class="added" role="status">
+        <img src="${urlOf(entryOf(S.justAdded))}" alt="">
+        <span class="t"><b>1コマ増えました</b>撮りはじめてから ${total}枚目の朝</span>
+        <button class="btn fill" type="button" id="addedNext">今日の気圧へ ›</button></div>` : ""}
+    </div>
+    <div class="strip"><div class="daystrip">${dayStrip}</div><div class="frames">${frames}</div></div>
+    <div class="pad">
+      ${S.entries.length ? "" : `<p class="empty-note">毎朝1枚、娘さんの顔を撮るとここにコマが並びます。寝起きのむくれ顔も、そのまま残しておきましょう。下の赤いボタンから撮れます。</p>`}
+      <div class="stats">
+        <div class="stat"><b class="num">${total}</b><span>撮った朝（これまで）</span></div>
+        <div class="stat"><b class="num">${sleepy === null ? "—" : sleepy + "%"}</b><span>ねむい・ふきげん</span></div>
+        <div class="stat"><b class="num">${evDays}<small style="font-size:13px">日</small></b><span>保健室・早退・頭痛</span></div>
+      </div>
+      ${lastNote ? `<p class="quote">「${esc(lastNote.note)}」<span class="num">${parse(lastNote.date).getMonth()+1}月${parse(lastNote.date).getDate()}日のひとこと</span></p>` : ""}
+    </div>`;
+
+  $("main").querySelectorAll("[data-open]").forEach(b => b.onclick = () => openDay(b.dataset.open));
+  $("main").querySelectorAll("[data-shoot]").forEach(b => b.onclick = openCamera);
+  $("btnSettings").onclick = openSettings;
+  $("mPrev").onclick = () => { S.view.m--; if (S.view.m < 0){ S.view.m = 11; S.view.y--; } render(); };
+  $("mNext").onclick = () => { S.view.m++; if (S.view.m > 11){ S.view.m = 0; S.view.y++; } render(); };
+  $("wxChip").onclick = () => { S.justAdded = null; if (!S.settings.place) return openPlacePicker(); S.tab = "wx"; render(); fetchWx(); };
+  if ($("addedNext")) $("addedNext").onclick = () => { S.justAdded = null; S.tab = "wx"; render(); $("main").scrollTop = 0; fetchWx(); };
+}
+
+/* ---------- 画面: 気圧 ---------- */
+function chartSVG(){
+  const i0 = wxNowIndex(); if (i0 < 0) return "";
+  const from = Math.max(0, i0 - 24), to = Math.min(S.wx.hpa.length - 1, i0 + 48);
+  const pts = []; for (let i = from; i <= to; i++) if (S.wx.hpa[i] != null) pts.push([i, S.wx.hpa[i]]);
+  if (pts.length < 4) return "";
+  const W = 360, H = 190, L = 34, R = 8, T = 12, B = 26;
+  let lo = Math.min(...pts.map(p => p[1])), hi = Math.max(...pts.map(p => p[1]));
+  lo = Math.floor(lo - 1); hi = Math.ceil(hi + 1); if (hi - lo < 6){ const mid = (hi + lo)/2; lo = Math.floor(mid - 3); hi = Math.ceil(mid + 3); }
+  const xs = i => L + (i - from) / (to - from) * (W - L - R);
+  const ys = v => T + (1 - (v - lo) / (hi - lo)) * (H - T - B);
+  let g = "";
+  const step = (hi - lo) <= 8 ? 2 : (hi - lo) <= 16 ? 4 : 5;
+  for (let v = Math.ceil(lo/step)*step; v <= hi; v += step)
+    g += `<line x1="${L}" x2="${W-R}" y1="${ys(v)}" y2="${ys(v)}" stroke="var(--line)"/><text x="${L-5}" y="${ys(v)+4}" font-size="10" text-anchor="end" fill="var(--muted)">${v}</text>`;
+  for (let i = from; i <= to; i++){
+    const t = S.wx.time[i], h = +t.slice(11,13);
+    if (h === 0){ const d = parse(t.slice(0,10)); g += `<line x1="${xs(i)}" x2="${xs(i)}" y1="${T}" y2="${H-B}" stroke="var(--line)" stroke-dasharray="2 3"/><text x="${xs(i)+3}" y="${H-8}" font-size="10" fill="var(--muted)">${d.getMonth()+1}/${d.getDate()}(${WEEK[d.getDay()]})</text>`; }
+  }
+  // 3時間で下がる区間に色をつける
+  let bands = "";
+  for (let i = from; i + 3 <= to; i++){
+    const a = S.wx.hpa[i], b = S.wx.hpa[i+3]; if (a == null || b == null) continue;
+    const d = a - b; if (d < 2.4) continue;
+    bands += `<rect x="${xs(i)}" y="${T}" width="${xs(i+3)-xs(i)}" height="${H-T-B}" fill="${d >= 3.2 ? "var(--alert)" : "var(--warn)"}" opacity=".10"/>`;
+  }
+  const past = pts.filter(p => p[0] <= i0), fut = pts.filter(p => p[0] >= i0);
+  const path = arr => arr.map((p,k) => (k ? "L" : "M") + xs(p[0]).toFixed(1) + " " + ys(p[1]).toFixed(1)).join(" ");
+  const nowV = S.wx.hpa[i0];
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="気圧の移り変わり（きのうから2日先まで）">
+    ${bands}${g}
+    <path d="${path(past)}" fill="none" stroke="var(--ink)" stroke-width="2" stroke-linejoin="round"/>
+    <path d="${path(fut)}" fill="none" stroke="var(--ink)" stroke-width="2" stroke-dasharray="5 4" stroke-linejoin="round"/>
+    <line x1="${xs(i0)}" x2="${xs(i0)}" y1="${T}" y2="${H-B}" stroke="var(--red)" stroke-width="1.5"/>
+    <circle cx="${xs(i0)}" cy="${ys(nowV)}" r="5" fill="var(--red)"/>
+    <text x="${xs(i0)+6}" y="${T+10}" font-size="10" font-weight="700" fill="var(--red)">いま</text>
+  </svg>`;
+}
+/* ---------- 1日の気圧の変化（5段階） ---------- */
+const LV = [null,
+  { n:1, t:"おだやか",     c:"#3F7D6B" },
+  { n:2, t:"小さめ",       c:"#86A960" },
+  { n:3, t:"ふつう",       c:"#D2A93A" },
+  { n:4, t:"大きい",       c:"#D9772B" },
+  { n:5, t:"とても大きい", c:"#C2452D" },
+];
+// 決め方（目安）：「3時間でいちばん下がった幅」と「1日の最高と最低の差」をそれぞれ5段階にして、大きいほう。
+// ただし2つが2段階以上ずれるときは1つ下げる（ゆっくり大きく上がる日などが高く出すぎないように）。
+// 区切りは、関東の約3か月分の実際の気圧から、毎日ある小さな上下では高くならないように決めた。
+function dayLevel(series){
+  if (!series || series.length < 3) return null;
+  const drop = maxDrop(series), range = Math.round((Math.max(...series) - Math.min(...series)) * 10) / 10;
+  const a = drop < 1.3 ? 1 : drop < 1.8 ? 2 : drop < 2.4 ? 3 : drop < 3.2 ? 4 : 5;
+  const b = range < 3.5 ? 1 : range < 4.5 ? 2 : range < 6 ? 3 : range < 9 ? 4 : 5;
+  const n = Math.abs(a - b) <= 1 ? Math.max(a, b) : Math.max(a, b) - 1;
+  return { ...LV[n], drop, range };
+}
+function meter(lv, big){
+  if (!lv) return `<span class="meter${big ? " big" : ""}" aria-label="データなし">${[1,2,3,4,5].map(() => `<i></i>`).join("")}</span>`;
+  return `<span class="meter${big ? " big" : ""}" role="img" aria-label="5段階の${lv.n}（${lv.t}）">${[1,2,3,4,5].map(i => `<i style="${i <= lv.n ? `background:${lv.c}` : ""}"></i>`).join("")}</span>`;
+}
+
+/* ---------- 気圧との関係（記録の集計） ---------- */
+const KINDS = [{ k:"any", t:"ぜんぶ" }, ...EVENTS.map(e => ({ k:e.k, t:e.s }))];
+function relation(kind){
+  const today = todayStr();
+  const isEv = d => { const k = d.kid || {}; return kind === "any" ? !!(k.nurse || k.early || k.headache) : !!k[kind]; };
+  const starts = [...S.entries.map(e => e.date), ...Object.values(S.days).filter(d => isEv(d) || (d.kid && d.kid.memo)).map(d => d.date)].sort();
+  if (!starts.length) return { total:0, ev:0 };
+  const days = Object.values(S.days).filter(d => d.date >= starts[0] && d.date < today && d.series).map(d => ({ d, lv: dayLevel(d.series), ev: isEv(d) }));
+  const g = (lo, hi) => { const a = days.filter(x => x.lv.n >= lo && x.lv.n <= hi); return { n:a.length, ev:a.filter(x => x.ev).length }; };
+  return { total:days.length, ev:days.filter(x => x.ev).length, big:g(4,5), mid:g(3,3), small:g(1,2), evDays:days.filter(x => x.ev) };
+}
+function relationHTML(kind){
+  const r = relation(kind), name = kind === "any" ? "保健室・早退・頭痛" : EVENTS.find(e => e.k === kind).s;
+  if (r.ev < 3 || r.total < 10){
+    const need = r.total < 10 ? `あと <b class="num">${10 - r.total}</b>日 記録すると` : `${name}のあった日が あと <b class="num">${3 - r.ev}</b>日 たまると`;
+    return `<p class="rel-wait">${need}、結果が出ます</p>`;
+  }
+  // くらべるのは「変化が大きい日（4・5）」と「それ以外の日（1〜3）」
+  const rest = { n: r.mid.n + r.small.n, ev: r.mid.ev + r.small.ev };
+  const rate = x => x.n ? x.ev / x.n : null, rb = rate(r.big), rs = rate(rest);
+  let verdict, c;
+  if (r.big.n < 3 || rest.n < 3){ verdict = "気圧の変化が大きい日と、そうでない日の両方の記録がまだ足りません"; c = "var(--muted)"; }
+  else if (rb >= 2 * rs && rb - rs >= 0.2){ verdict = "気圧の変化が大きい日に、起きやすい傾向があります"; c = "var(--alert)"; }
+  else if (rb <= rs){ verdict = "今のところ、気圧の変化との関係は見えていません"; c = "var(--calm)"; }
+  else { verdict = "少し関係がありそうですが、まだはっきりしません"; c = "var(--warn)"; }
+  const row = (label, x, lvn) => `<div class="rel-row num"><span>${meter(LV[lvn])}</span><span>${label}</span>
+    <span class="rel-bar"><i style="width:${x.n ? Math.round(x.ev / x.n * 100) : 0}%"></i></span>
+    <span class="rel-n">${x.n ? `${x.ev}/${x.n}日（${Math.round(x.ev / x.n * 100)}%）` : "—"}</span></div>`;
+  const bigEv = r.evDays.filter(x => x.lv.n >= 4).length;
+  return `<div class="rel"><p class="rel-verdict" style="--c:${c}">${verdict}</p>
+    <p class="hint num">${name}のあった${r.ev}日のうち <b>${bigEv}</b>日が、変化の大きい日でした。</p>
+    <div class="rel-rows">${row("変化が大きい日（4・5）", r.big, 5)}${row("ふつうの日（3）", r.mid, 3)}${row("変化が小さい日（1・2）", r.small, 1)}</div>
+    <p class="hint">記録した${r.total}日の集計で、診断ではありません。</p></div>`;
+}
+
+/* ---------- 画面: 天気と気圧 ---------- */
+function renderWx(){
+  const p = S.settings.place, sum = wxSummary(), today = todayStr();
+  const tday = S.days[today] || {};
+  const placeBtn = `<button type="button" class="place-btn" id="btnPlace">${p ? `場所：<b>${esc(p.name)}</b>${p.pref ? `<span class="hint">（${esc(p.pref)}）</span>` : ""}` : "<b>場所を選ぶ</b>"}<span class="hint">変更 ›</span></button>`;
+  let head;
+  if (!p || (p.auto && p.name === "東京")){
+    head = `<div class="setup"><p><b>${p ? "いまは仮に東京の天気を出しています" : "天気と気圧を見る場所を選んでください"}</b></p>
+      <p class="hint">住んでいる市や町を選ぶと、その場所の天気と気圧が毎日自動で入ります。</p>
+      <button class="btn fill block" type="button" id="pickPlace">場所を選ぶ</button></div>`;
+  } else head = "";
+  if (p && !sum){
+    head += `<div class="status-card">${S.wxErr
+        ? `<p><b>まだ取れていません</b></p><p class="hint">${esc(S.wxErr)}</p>
+           <button class="btn fill" type="button" id="wxRetry">いますぐ取る</button>
+           <p class="hint">何度やっても取れないときは、①Wi-Fiかモバイル通信につながっているか ②広告ブロックなどのアプリを入れていないか ③「省データモード」がオンになっていないか、を確かめてください。</p>`
+        : `<p class="hint">${esc(p.name)} の天気と気圧を取っています…</p>`}</div>`;
+  } else if (p && sum){
+    const lvT = dayLevel(tday.series), n = wxNow(), at = new Date(S.wx.at);
+    const shot = amPmHTML(tday.series, "ampm-line");
+    head += `<div class="today-lv">
+        <div class="tl-top"><span class="label">今日の気圧の変化（${S.wx.src === "jma" ? "ここまで" : "予想"}）</span>
+          <span class="hint num">${at.getHours()}:${pad(at.getMinutes())} 更新${S.wx.src === "jma" ? `・気象庁 ${esc(S.wx.station)}` : ""}</span></div>
+        <div class="lv-line">${meter(lvT, true)}<b style="color:${lvT ? lvT.c : "var(--muted)"}">${lvT ? `${lvT.n} ${lvT.t}` : "—"}</b></div>
+        <div class="wx-line num">${n && n.w ? `${wxIcon(n.w.i, 20)}<b>${n.w.t}</b>` : ""}<span class="t">いま <b>${Math.round(sum.now)}</b> hPa${sum.delta === null ? "" : `（3時間で ${sum.delta > 0 ? "+" : ""}${sum.delta.toFixed(1)}）`}${n && n.temp != null ? ` ・ ${n.temp}℃` : ""}</span></div>
+        ${sum.lv.k !== "calm" ? `<p class="warn-line">${sum.when !== null ? sum.when + "時ごろから" : "この先"}気圧が下がりそうです。早めに休める準備を。</p>` : ""}
+        ${shot}
+      </div>
+      ${S.wxErr ? `<p class="hint" style="margin-top:8px">${esc(S.wxErr)}</p>` : ""}`;
+  }
+  const list = []; for (let i = 0; i < 14; i++){ const ds = addDays(today, -i); list.push(S.days[ds] || { date: ds }); }
+  const rows = list.map(d => {
+    const dd = parse(d.date), e = entryOf(d.date), k = d.kid || {}, w = wxName(d.wcode), lv = dayLevel(d.series), isT = d.date === today;
+    const mood = e ? MOODS.find(x => x.k === e.mood) : null;
+    const evs = EVENTS.filter(x => k[x.k]).map(x => `<span class="evchip" style="background:${x.c}">${x.s}</span>`).join("");
+    const mid = lv
+      ? `<span class="lv-line">${meter(lv)}<b style="font-size:12px;color:${lv.c}">${lv.n} ${lv.t}${isT ? (S.wx && S.wx.src === "jma" ? "（ここまで）" : "（予想）") : ""}</b></span>
+         <span style="font-size:11px;color:var(--muted)">${w ? w.t + " ・ " : ""}${amPmHTML(d.series, "ampm-s")}</span>`
+      : `<span style="font-size:11px;color:var(--muted)">${d.manual ? `手入力 ${d.manual} hPa` : "天気・気圧のデータなし"}</span>`;
+    return `<button type="button" class="day num" data-day="${d.date}">
+      <span class="d">${dd.getMonth()+1}/${dd.getDate()}<span style="font-weight:400;color:var(--muted)">（${WEEK[dd.getDay()]}）</span><br>${w ? wxIcon(w.i, 18) : ""}</span>
+      <span>${mid}</span>
+      <span class="r">${evs || ""}${mood ? `<span style="font-size:11px;color:var(--muted)">${mood.t}</span>` : (evs ? "" : `<span style="opacity:.5">—</span>`)}</span></button>`;
+  }).join("");
+  const kind = S.relKind || "any";
+
+  $("main").innerHTML = `<div class="pad">
+    <div class="mast"><div><div class="eyebrow">WEATHER ・ 天気と気圧</div>
+      <h1 style="margin:4px 0 0;font-family:var(--serif);font-weight:600;font-size:30px;letter-spacing:.05em">今日の天気と気圧</h1></div>
+      <button class="icon-btn" type="button" id="btnSettings" aria-label="設定"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg></button></div>
+    ${placeBtn}
+    ${head}
+    <h2 class="sec-title">今日の娘のようす</h2>
+    ${evButtons(today)}
+    <h2 class="sec-title">気圧との関係</h2>
+    ${(() => { const ra = relation("any"); return ra.ev >= 3 && ra.total >= 10
+      ? `<div class="kinds">${KINDS.map(x => `<button type="button" data-kind="${x.k}" class="${kind === x.k ? "on" : ""}">${x.t}</button>`).join("")}</div>` : ""; })()}
+    ${relationHTML(kind)}
+    ${sum ? `<details class="chart-box" id="chartBox" ${S.chartOpen ? "open" : ""}><summary>気圧のグラフ（きのう〜あさって）</summary>
+      <div class="chart">${chartSVG()}
+        <div class="legend"><span><svg width="18" height="4"><line x1="0" x2="18" y1="2" y2="2" stroke="var(--ink)" stroke-width="2"/></svg>これまで</span>
+          ${S.wx.src === "jma" ? "" : `<span><svg width="18" height="4"><line x1="0" x2="18" y1="2" y2="2" stroke="var(--ink)" stroke-width="2" stroke-dasharray="4 3"/></svg>予報</span>`}
+          <span><i class="dot" style="background:var(--warn);opacity:.5"></i>下がる時間帯</span></div></div></details>` : ""}
+    <h2 class="sec-title">この2週間</h2>
+    <div class="days">${rows}</div>
+    <p class="credit">データ: <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a>、<a href="https://www.jma.go.jp/" target="_blank" rel="noopener">気象庁</a>（観測値を加工）。5段階は目安です。</p>
+  </div>`;
+
+  $("btnSettings").onclick = openSettings;
+  $("btnPlace").onclick = openPlacePicker;
+  if ($("pickPlace")) $("pickPlace").onclick = openPlacePicker;
+  bindEvButtons($("main"), today, render);
+  if ($("chartBox")) $("chartBox").addEventListener("toggle", e => { S.chartOpen = e.target.open; });
+  $("main").querySelectorAll("[data-kind]").forEach(b => b.onclick = () => { S.relKind = b.dataset.kind; render(); });
+  $("main").querySelectorAll("[data-day]").forEach(b => b.onclick = () => openDay(b.dataset.day));
+  if ($("wxRetry")) $("wxRetry").onclick = () => { S.wxErr = ""; S.wxFails = 0; render(); fetchWx(true); };
+}
+function setPlace(p){ S.settings.place = p; LS.set("settings", S.settings); S.wx = null; render(); fetchWx(true); }
+
+/* ---------- 場所を選ぶ ---------- */
+const PREFS = [
+  ["北海道","札幌",43.06,141.35],["青森県","青森",40.82,140.74],["岩手県","盛岡",39.70,141.15],["宮城県","仙台",38.27,140.87],["秋田県","秋田",39.72,140.10],
+  ["山形県","山形",38.24,140.36],["福島県","福島",37.75,140.47],["茨城県","水戸",36.34,140.45],["栃木県","宇都宮",36.57,139.88],["群馬県","前橋",36.39,139.06],
+  ["埼玉県","さいたま",35.86,139.65],["千葉県","千葉",35.61,140.12],["東京都","東京",35.68,139.76],["神奈川県","横浜",35.44,139.64],["新潟県","新潟",37.92,139.04],
+  ["富山県","富山",36.70,137.21],["石川県","金沢",36.56,136.66],["福井県","福井",36.06,136.22],["山梨県","甲府",35.66,138.57],["長野県","長野",36.65,138.18],
+  ["岐阜県","岐阜",35.42,136.76],["静岡県","静岡",34.98,138.38],["愛知県","名古屋",35.18,136.91],["三重県","津",34.73,136.51],["滋賀県","大津",35.00,135.87],
+  ["京都府","京都",35.01,135.77],["大阪府","大阪",34.69,135.50],["兵庫県","神戸",34.69,135.20],["奈良県","奈良",34.69,135.83],["和歌山県","和歌山",34.23,135.17],
+  ["鳥取県","鳥取",35.50,134.24],["島根県","松江",35.47,133.05],["岡山県","岡山",34.66,133.93],["広島県","広島",34.39,132.46],["山口県","山口",34.19,131.47],
+  ["徳島県","徳島",34.07,134.56],["香川県","高松",34.34,134.05],["愛媛県","松山",33.84,132.77],["高知県","高知",33.56,133.53],["福岡県","福岡",33.59,130.40],
+  ["佐賀県","佐賀",33.25,130.30],["長崎県","長崎",32.75,129.87],["熊本県","熊本",32.80,130.71],["大分県","大分",33.24,131.61],["宮崎県","宮崎",31.91,131.42],
+  ["鹿児島県","鹿児島",31.60,130.56],["沖縄県","那覇",26.21,127.68]
+];
+function openPlacePicker(){
+  if (document.querySelector(".sheet-wrap[data-picker]")) return;   // 2重に開かない
+  const cur = S.settings.place;
+  const w = sheet(`<div class="sheet-head"><h2>天気と気圧を見る場所</h2><button class="close" type="button" data-close>閉じる</button></div>
+    ${cur ? `<p class="hint">いま：<b>${esc(cur.name)}</b>${cur.pref ? `（${esc(cur.pref)}）` : ""}</p>` : ""}
+    <form class="field" id="plForm"><label for="plQ">市や町の名前でさがす</label>
+      <div class="manual"><input id="plQ" type="search" enterkeyhint="search" placeholder="例 横浜市、札幌市" autocomplete="off"><button class="btn fill" type="submit">さがす</button></div></form>
+    <div class="pl-list" id="plRes"></div>
+    <button class="btn quiet" type="button" id="plGeo">今いる場所を使う</button>
+    <div class="field"><label for="plPref">都道府県から選ぶ（県庁所在地の天気）</label>
+      <select id="plPref"><option value="">選んでください</option>${PREFS.map((c,i) => `<option value="${i}">${c[0]}（${c[1]}）</option>`).join("")}</select></div>
+    <p class="err" id="plErr" hidden></p>
+    <p class="hint">場所はおおよそ（約1km単位）にしてから天気サービスに送ります。</p>`);
+  w.setAttribute("data-picker", "");
+  const err = t => { const e = w.querySelector("#plErr"); e.textContent = t; e.hidden = !t; };
+  const done = p => { w.remove(); setPlace(p); S.tab = "wx"; render(); toast(`${p.name} の天気と気圧を入れます`); };
+  w.querySelector("#plForm").onsubmit = async ev => {
+    ev.preventDefault(); err("");
+    const q = w.querySelector("#plQ").value.trim(), box = w.querySelector("#plRes");
+    if (!q) return err("市や町の名前を入れてください。");
+    box.innerHTML = `<p class="hint">さがしています…</p>`;
+    try {
+      const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 10000);
+      const r = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=10&language=ja&countryCode=JP`, { signal: ctl.signal }).finally(() => clearTimeout(t));
+      const j = await r.json();
+      const res = (j.results || []).filter(x => /^(PPL|ADM)/.test(x.feature_code || "")).slice(0, 8);
+      if (!res.length){ box.innerHTML = ""; return err(`「${q}」は見つかりませんでした。「横浜市」のように「市・町・村」まで入れてみてください。`); }
+      box.innerHTML = res.map((x,i) => `<button type="button" class="pl-item" data-i="${i}"><b>${esc(x.name)}</b><span class="hint">${esc(x.admin1 || "")}${x.admin2 && x.admin2 !== x.name ? " " + esc(x.admin2) : ""}</span></button>`).join("");
+      box.querySelectorAll("[data-i]").forEach(b => b.onclick = () => { const x = res[+b.dataset.i];
+        done({ name:x.name, pref:x.admin1 || "", lat:+x.latitude.toFixed(2), lon:+x.longitude.toFixed(2) }); });
+    } catch { box.innerHTML = ""; err("さがせませんでした。通信できる場所で、もう一度ためしてください。"); }
+  };
+  w.querySelector("#plPref").onchange = e => { const c = PREFS[+e.target.value]; if (c) done({ name:c[1], pref:c[0], lat:c[2], lon:c[3] }); };
+  w.querySelector("#plGeo").onclick = () => {
+    err("");
+    if (!navigator.geolocation) return err("この端末では場所を使えません。名前でさがすか、都道府県から選んでください。");
+    const b = w.querySelector("#plGeo"); b.disabled = true; b.textContent = "場所を確かめています…";
+    let settled = false;
+    const fail = () => { if (settled) return; settled = true; b.disabled = false; b.textContent = "今いる場所を使う";
+      err("場所を取れませんでした。スマホの設定で位置情報を許可するか、名前でさがしてください。"); };
+    const timer = setTimeout(fail, 15000);   // 許可の画面が閉じられても止まらないように
+    navigator.geolocation.getCurrentPosition(
+      pos => { if (settled) return; settled = true; clearTimeout(timer); done({ name:"今いる場所", lat:+pos.coords.latitude.toFixed(2), lon:+pos.coords.longitude.toFixed(2) }); },
+      () => { clearTimeout(timer); fail(); }, { enableHighAccuracy:false, timeout:10000, maximumAge:3600000 });
+  };
+  setTimeout(() => { const q = w.querySelector("#plQ"); if (q && !cur) q.focus(); }, 50);
+}
+
+/* ---------- レイヤー（シート） ---------- */
+function sheet(html){
+  const w = document.createElement("div"); w.className = "sheet-wrap";
+  w.innerHTML = `<div class="sheet" role="dialog" aria-modal="true">${html}</div>`;
+  w.addEventListener("click", e => { if (e.target === w || e.target.closest("[data-close]")) w.remove(); });
+  $("layer").appendChild(w); return w;
+}
+
+function moodButtons(sel){ return MOODS.map(m => `<button type="button" data-mood="${m.k}" class="${sel === m.k ? "on" : ""}"><span class="dot" style="background:${m.c};width:12px;height:12px"></span>${m.t}</button>`).join(""); }
+
+// 撮ったあと：きぶん・ひとことを付けて保存
+function openReview(blob, existing, presetDate){
+  let date = existing ? existing.date : (presetDate || todayStr());
+  const url = URL.createObjectURL(blob);
+  let mood = existing?.mood || "sleepy";
+  const w = sheet(`<div class="sheet-head"><h2>${existing ? "記録をなおす" : "朝の1コマ"}</h2><button class="close" type="button" data-close>やめる</button></div>
+    <img class="photo-big" src="${url}" alt="撮った写真">
+    <div class="field"><label for="rvDate">どの日の朝？</label><input id="rvDate" type="date" value="${date}" max="${todayStr()}" ${existing ? "disabled" : ""}></div>
+    <p class="hint" id="rvPrev" hidden>この日はもう1枚あります。保存すると、こちらに入れかわります。</p>
+    <div class="field"><label>その朝のきぶん</label><div class="moods" id="rvMoods">${moodButtons(mood)}</div></div>
+    <div class="field"><label for="rvNote">娘のひとこと（なくてもOK）</label><input id="rvNote" maxlength="60" placeholder="例「きょう体育ある？」" value="${esc(existing?.note || "")}"></div>
+    <p class="err" id="rvErr" hidden></p>
+    <div class="actions sticky-actions">${existing ? "" : `<button class="btn quiet" type="button" id="rvRetake">撮り直す</button>`}<button class="btn fill" type="button" id="rvSave">保存する</button></div>`);
+  const showPrev = () => { w.querySelector("#rvPrev").hidden = existing || !entryOf(date); };
+  showPrev();
+  w.querySelector("#rvDate").onchange = e => { if (e.target.value && e.target.value <= todayStr()) date = e.target.value; else e.target.value = date; showPrev(); };
+  w.querySelector("#rvMoods").onclick = e => { const b = e.target.closest("[data-mood]"); if (!b) return; mood = b.dataset.mood; w.querySelectorAll("[data-mood]").forEach(x => x.classList.toggle("on", x === b)); };
+  if (w.querySelector("#rvRetake")) w.querySelector("#rvRetake").onclick = () => { w.remove(); URL.revokeObjectURL(url); openCamera(); };
+  w.querySelector("#rvSave").onclick = async () => {
+    const rec = { date, photo: blob, mood, note: w.querySelector("#rvNote").value.trim(), createdAt: existing?.createdAt || Date.now() };
+    try {
+      await put("entries", rec);
+      if (S.urls[date]) { URL.revokeObjectURL(S.urls[date]); delete S.urls[date]; }
+      S.entries = S.entries.filter(e => e.date !== date).concat(rec).sort((a,b) => a.date < b.date ? -1 : 1);
+      URL.revokeObjectURL(url); w.remove();
+      const d = parse(date); S.view = { y:d.getFullYear(), m:d.getMonth() }; S.tab = "film";
+      S.justAdded = existing ? null : date;
+      if (!existing && date < todayStr()) fetchWx(true);   // 前の日の写真なら、その日の天気・気圧もさかのぼって取る render(); $("main").scrollTop = 0;
+      if (existing) toast("なおしました");
+    } catch {
+      const er = w.querySelector("#rvErr"); er.textContent = "保存できませんでした。スマホの空き容量を確かめて、もう一度押してください。"; er.hidden = false;
+    }
+  };
+}
+
+// 娘のようす（保健室・早退・頭痛）のボタン
+function evButtons(date){
+  const k = kidOf(date);
+  return `<div class="ev-btns">${EVENTS.map(x => `<button type="button" data-ev="${x.k}" class="${k[x.k] ? "on" : ""}" style="--c:${x.c}" aria-pressed="${!!k[x.k]}"><span class="box"></span>${x.t}</button>`).join("")}</div>`;
+}
+function bindEvButtons(root, date, after){
+  root.querySelectorAll("[data-ev]").forEach(b => b.onclick = async () => {
+    const key = b.dataset.ev, on = !kidOf(date)[key];
+    await setKid(date, { [key]: on });
+    b.classList.toggle("on", on); b.setAttribute("aria-pressed", on);
+    if (after) after();
+  });
+}
+
+// 1日ぶんをまとめて見る：顔・娘のようす・天気・気圧
+function openDay(date){
+  const e = entryOf(date), d = parse(date), day = S.days[date] || {}, k = kidOf(date);
+  const mo = e ? MOODS.find(m => m.k === e.mood) : null, w = wxName(day.wcode), isToday = date === todayStr();
+  let wxBlock;
+  if (day.series){
+    const lv = dayLevel(day.series), anyEv = !!(k.nurse || k.early || k.headache);
+    const note = !anyEv ? "" : lv.n >= 4
+      ? `<p class="warn-line" style="color:${lv.c}">この日は気圧の変化が大きい日でした。気圧が関係しているかもしれません。</p>`
+      : lv.n <= 2 ? `<p class="hint">この日は気圧の変化が小さい日でした。ほかの原因も考えられます。</p>`
+      : `<p class="hint">この日の気圧の変化は、ふつうくらいでした。</p>`;
+    wxBlock = `<div class="daycard">
+      <div class="row num">${w ? `${wxIcon(w.i, 22)}<b>${w.t}</b>` : `<b>天気のデータなし</b>`}${day.tmax != null ? `<span class="hint">最高 ${Math.round(day.tmax)}℃ / 最低 ${Math.round(day.tmin)}℃</span>` : ""}</div>
+      <div class="row num"><span class="hint">気圧の変化${isToday ? "（予想）" : ""}</span>${meter(lv, true)}<b style="color:${lv.c}">${lv.n} ${lv.t}</b></div>
+      <div class="row">${amPmHTML(day.series)}</div>
+      ${note}
+      ${sparkSVG(day.series)}
+    </div>`;
+  } else {
+    wxBlock = `<div class="daycard"><span class="hint">${day.manual ? `手で入れた気圧 <b class="num">${day.manual} hPa</b>（${esc(day.manualAt || "")}）` : "この日の天気・気圧はまだ取れていません。気圧の画面を開くと、2週間前までさかのぼって入ります。"}</span></div>`;
+  }
+  const w2 = sheet(`<div class="sheet-head"><h2 class="num">${d.getMonth()+1}月${d.getDate()}日（${WEEK[d.getDay()]}）${isToday ? "<span class=\"hint\" style=\"margin-left:8px\">今日</span>" : ""}</h2><button class="close" type="button" data-close>閉じる</button></div>
+    ${e ? `<img class="photo-big" src="${urlOf(e)}" alt="${d.getMonth()+1}月${d.getDate()}日の顔">
+      <div class="chips num">${mo ? `<span class="chip"><span class="dot" style="background:${mo.c};display:inline-block;margin-right:5px"></span>朝は${mo.t}</span>` : ""}</div>
+      ${e.note ? `<p class="quote" style="margin:0">「${esc(e.note)}」</p>` : ""}`
+      : `<button class="btn block" type="button" id="dyAddPhoto">この日の写真を入れる</button>`}
+    <div class="field"><label>娘のようす</label>${evButtons(date)}</div>
+    <div class="field"><label for="dyMemo">メモ（何時ごろ・どんな様子だったか など）</label>
+      <textarea id="dyMemo" rows="2" maxlength="200" placeholder="例 5時間目に保健室。帰ってから頭が痛いと言って横になった">${esc(k.memo || "")}</textarea></div>
+    <div class="field"><label>この日の天気と気圧</label>${wxBlock}</div>
+    ${e ? `<div class="actions" id="dtActs"><button class="btn quiet" type="button" id="dtDel" style="margin-right:auto;color:var(--alert)">写真を削除</button><button class="btn" type="button" id="dtEdit">きぶん・ひとことをなおす</button></div>
+    <div class="confirm" id="dtConfirm" hidden><span>この日の写真ときぶん・ひとことを削除します。娘のようすと天気の記録は残ります。元に戻せません。</span>
+      <div class="actions"><button class="btn quiet" type="button" id="dtNo">やめる</button><button class="btn danger" type="button" id="dtYes">削除する</button></div></div>` : ""}`);
+  bindEvButtons(w2, date, render);
+  const memo = w2.querySelector("#dyMemo"); let saved = k.memo || "";
+  const saveMemo = async () => { const v = memo.value.trim(); if (v === saved) return; saved = v; await setKid(date, { memo: v }); render(); toast("メモを保存しました"); };
+  memo.addEventListener("blur", saveMemo);
+  w2.addEventListener("click", ev => { if (ev.target === w2 || ev.target.closest("[data-close]")) saveMemo(); }, true);
+  if (w2.querySelector("#dyAddPhoto")) w2.querySelector("#dyAddPhoto").onclick = async () => { await saveMemo(); w2.remove(); S.pickDate = date; $("fileLib").click(); };
+  if (!e) return;
+  w2.querySelector("#dtEdit").onclick = async () => { await saveMemo(); w2.remove(); openReview(e.photo, e); };
+  w2.querySelector("#dtDel").onclick = () => { w2.querySelector("#dtConfirm").hidden = false; w2.querySelector("#dtActs").hidden = true; };
+  w2.querySelector("#dtNo").onclick = () => { w2.querySelector("#dtConfirm").hidden = true; w2.querySelector("#dtActs").hidden = false; };
+  w2.querySelector("#dtYes").onclick = async () => {
+    await del("entries", date);
+    if (S.urls[date]) { URL.revokeObjectURL(S.urls[date]); delete S.urls[date]; }
+    S.entries = S.entries.filter(x => x.date !== date); w2.remove(); render(); toast("写真を削除しました");
+  };
+}
+
+/* ---------- 設定・バックアップ ---------- */
+function openSettings(){
+  const st = S.settings;
+  const w = sheet(`<div class="sheet-head"><h2>設定</h2><button class="close" type="button" data-close>閉じる</button></div>
+    <div class="row2">
+      <div class="field"><label for="stName">娘の呼び名</label><input id="stName" maxlength="12" value="${esc(st.name)}" placeholder="例 みお"></div>
+      <div class="field"><label for="stGrade">今の学年</label><select id="stGrade">${[1,2,3,4,5,6].map(g => `<option value="${g}" ${gradeAt(new Date()) === g ? "selected" : ""}>小学${g}年生</option>`).join("")}</select></div>
+    </div>
+    <p class="hint">学年は毎年4月に自動で1つ上がります。</p>
+    <button class="btn fill block" type="button" id="stSave">保存する</button>
+    <div class="field"><label>天気と気圧を見る場所</label>
+      <button type="button" class="place-btn" id="stPlace" style="margin-top:0">${st.place ? `<b>${esc(st.place.name)}</b>${st.place.pref ? `<span class="hint">（${esc(st.place.pref)}）</span>` : ""}` : "<b>まだ選んでいません</b>"}<span class="hint">変更 ›</span></button></div>
+    <h3 style="margin:10px 0 0;font-family:var(--serif);font-size:17px;font-weight:600">写真の保管</h3>
+    <p class="hint">写真はこのスマホの中だけに保存しています。機種変更の前や、月に1回くらいは書き出しておくと安心です。</p>
+    <div class="row2"><button class="btn" type="button" id="stExport">書き出す</button><button class="btn" type="button" id="stImport">読み込む</button></div>
+    <p class="hint num" id="stUsage"></p>`);
+  w.querySelector("#stPlace").onclick = () => { w.remove(); openPlacePicker(); };
+  w.querySelector("#stSave").onclick = () => {
+    const g = +w.querySelector("#stGrade").value;
+    S.settings = { ...S.settings, name: w.querySelector("#stName").value.trim(), grade: g, gradeYear: schoolYear(new Date()) };
+    LS.set("settings", S.settings);
+    w.remove(); render();
+    toast("保存しました");
+  };
+  w.querySelector("#stExport").onclick = exportAll;
+  w.querySelector("#stImport").onclick = () => $("fileBackup").click();
+  if (navigator.storage && navigator.storage.estimate) navigator.storage.estimate().then(e => {
+    const el = w.querySelector("#stUsage"); if (el) el.textContent = `いまの使用量 約${Math.round((e.usage||0)/1024/1024)}MB ・ 写真 ${S.entries.length}枚`;
+  });
+}
+const toDataURL = b => new Promise(r => { const f = new FileReader(); f.onload = () => r(f.result); f.readAsDataURL(b); });
+async function exportAll(){
+  const entries = [];
+  for (const e of S.entries) entries.push({ ...e, photo: await toDataURL(e.photo) });
+  const data = { app:"asa-film", version:1, exportedAt:new Date().toISOString(), settings:S.settings, entries, days:Object.values(S.days) };
+  const blob = new Blob([JSON.stringify(data)], { type:"application/json" });
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `asa-film-${todayStr()}.json`;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+$("fileBackup").onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ""; if (!f) return;
+  try {
+    const j = JSON.parse(await f.text()); if (j.app !== "asa-film") throw 0;
+    for (const x of j.entries || []) { const blob = await (await fetch(x.photo)).blob(); await put("entries", { ...x, photo: blob }); }
+    for (const d of j.days || []) await put("days", d);
+    if (j.settings) { S.settings = { ...S.settings, ...j.settings }; LS.set("settings", S.settings); }
+    $("layer").innerHTML = ""; await loadAll(); toast(`${(j.entries||[]).length}枚の写真を読み込みました`);
+  } catch { toast("このファイルは読み込めませんでした"); }
+};
+
+/* ---------- カメラ ---------- */
+let stream = null, facing = "environment";
+function stopStream(){ if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; } }
+function openCamera(){
+  const last = [...S.entries].reverse().find(e => e.date !== todayStr()) || S.entries[S.entries.length-1];
+  let ghostOn = !!last;
+  const c = document.createElement("div"); c.className = "cam";
+  c.innerHTML = `<div class="cam-top"><button type="button" id="cmClose">閉じる</button><span>けさの顔</span><button type="button" id="cmFlip">切りかえ</button></div>
+    <div class="viewer"><div class="box">
+      <video id="cmVideo" playsinline muted autoplay></video>
+      ${last ? `<img class="ghost" id="cmGhost" src="${urlOf(last)}" alt="">` : ""}
+      <div class="guide"></div>
+      <div class="cam-msg" id="cmMsg" hidden></div>
+    </div></div>
+    <div class="cam-bottom">
+      <button type="button" class="side ${ghostOn ? "on" : ""}" id="cmGhostBtn" ${last ? "" : `style="visibility:hidden"`}>前回を重ねる<br>${ghostOn ? "ON" : "OFF"}</button>
+      <button type="button" class="shutter" id="cmShot" aria-label="撮る"><i></i></button>
+      <button type="button" class="side" id="cmLib">写真から<br>選ぶ</button>
+    </div>`;
+  document.body.appendChild(c);
+  const video = c.querySelector("#cmVideo"), msg = c.querySelector("#cmMsg");
+  const close = () => { stopStream(); c.remove(); };
+  c.querySelector("#cmClose").onclick = close;
+  c.querySelector("#cmLib").onclick = () => { $("fileLib").click(); };
+  const gb = c.querySelector("#cmGhostBtn");
+  gb.onclick = () => { ghostOn = !ghostOn; gb.classList.toggle("on", ghostOn); gb.innerHTML = `前回を重ねる<br>${ghostOn ? "ON" : "OFF"}`; const g = c.querySelector("#cmGhost"); if (g) g.hidden = !ghostOn; };
+  const showFallback = () => {
+    msg.hidden = false;
+    msg.innerHTML = `<span>このままではカメラを使えませんでした。<br>スマホのカメラで撮るか、写真を選んでください。</span>
+      <button class="btn fill" type="button" id="cmFile">カメラで撮る</button><button class="btn" type="button" id="cmFile2">写真を選ぶ</button>`;
+    msg.querySelector("#cmFile").onclick = () => $("fileCam").click();
+    msg.querySelector("#cmFile2").onclick = () => $("fileLib").click();
+    c.querySelector("#cmShot").disabled = true; c.querySelector("#cmShot").style.opacity = .3;
+  };
+  const start = async () => {
+    stopStream();
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return showFallback();
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:facing, width:{ ideal:1440 }, height:{ ideal:1920 } }, audio:false });
+      video.srcObject = stream; video.classList.toggle("mirror", facing === "user"); await video.play().catch(() => {});
+    } catch { showFallback(); }
+  };
+  c.querySelector("#cmFlip").onclick = () => { facing = facing === "user" ? "environment" : "user"; start(); };
+  c.querySelector("#cmShot").onclick = () => {
+    const vw = video.videoWidth, vh = video.videoHeight; if (!vw) return;
+    let sw = vw, sh = vw * 4/3; if (sh > vh){ sh = vh; sw = vh * 3/4; }
+    const scale = Math.min(1, 1200 / sw), cv = document.createElement("canvas");
+    cv.width = Math.round(sw * scale); cv.height = Math.round(sh * scale);
+    const ctx = cv.getContext("2d");
+    if (facing === "user"){ ctx.translate(cv.width, 0); ctx.scale(-1, 1); }
+    ctx.drawImage(video, (vw - sw)/2, (vh - sh)/2, sw, sh, 0, 0, cv.width, cv.height);
+    cv.toBlob(b => { if (!b) return; close(); openReview(b); }, "image/jpeg", 0.88);
+  };
+  S.closeCam = close;
+  start();
+}
+// スマホのカメラ／写真から選んだときは、3:4 に整えて小さくしてから使う
+async function fromFile(file){
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
+    const vw = img.naturalWidth, vh = img.naturalHeight;
+    let sw = vw, sh = vw * 4/3; if (sh > vh){ sh = vh; sw = vh * 3/4; }
+    const scale = Math.min(1, 1200 / sw), cv = document.createElement("canvas");
+    cv.width = Math.round(sw * scale); cv.height = Math.round(sh * scale);
+    cv.getContext("2d").drawImage(img, (vw - sw)/2, (vh - sh)/2, sw, sh, 0, 0, cv.width, cv.height);
+    return await new Promise((res, rej) => cv.toBlob(b => b ? res(b) : rej(), "image/jpeg", 0.88));
+  } finally { URL.revokeObjectURL(url); }
+}
+["fileCam","fileLib"].forEach(id => $(id).onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ""; if (!f) return;
+  try { const b = await fromFile(f); if (S.closeCam) S.closeCam(); const pd = S.pickDate; S.pickDate = null; openReview(b, null, pd); }
+  catch { toast("この写真は読み込めませんでした"); }
+});
+
+/* ---------- 全体 ---------- */
+function render(){
+  $("tabFilm").classList.toggle("on", S.tab === "film");
+  $("tabWx").classList.toggle("on", S.tab === "wx");
+  if (S.tab === "film") renderFilm(); else renderWx();
+}
+$("tabFilm").onclick = () => { S.tab = "film"; render(); $("main").scrollTop = 0; };
+$("tabWx").onclick = () => { S.tab = "wx"; render(); $("main").scrollTop = 0; fetchWx(); };
+$("tabShoot").onclick = openCamera;
+document.addEventListener("keydown", e => { if (e.key === "Escape") { $("layer").innerHTML = ""; if (S.closeCam && document.querySelector(".cam")) S.closeCam(); } });
+document.addEventListener("visibilitychange", () => { if (!document.hidden) fetchWx(); });
+window.addEventListener("online", () => fetchWx(true));   // 電波が戻ったらすぐ取り直す
+
+async function loadAll(){
+  Object.values(S.urls).forEach(u => URL.revokeObjectURL(u)); S.urls = {};
+  S.entries = (await getAll("entries")).sort((a,b) => a.date < b.date ? -1 : 1);
+  S.days = {}; (await getAll("days")).forEach(d => S.days[d.date] = d);
+  if (S.wx && S.wx.time) { try { await saveDays(); } catch {} }
+  render();
+}
+(async () => {
+  try { DB = await openDB(); await loadAll(); }
+  catch { $("main").innerHTML = `<div class="pad"><p class="err">写真の保存場所を開けませんでした。プライベートブラウズを切って開き直してください。</p></div>`; }
+  if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+  if ("serviceWorker" in navigator && location.protocol !== "file:") navigator.serviceWorker.register("sw.js").catch(() => {});
+  if (S.settings.place) fetchWx();
+  setInterval(() => fetchWx(), 30 * 60 * 1000);   // 開いたままでも30分ごとに新しくする
+})();
+})();
+</script>
+</body>
+</html>
