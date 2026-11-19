@@ -920,7 +920,8 @@ function openReview(blob, existing, presetDate){
       URL.revokeObjectURL(url); w.remove();
       const d = parse(date); S.view = { y:d.getFullYear(), m:d.getMonth() }; S.tab = "film";
       S.justAdded = existing ? null : date;
-      if (!existing && date < todayStr()) fetchWx(true);   // 前の日の写真なら、その日の天気・気圧もさかのぼって取る render(); $("main").scrollTop = 0;
+      if (!existing && date < todayStr()) fetchWx(true);   // 前の日の写真なら、その日の天気・気圧もさかのぼって取る
+      render(); $("main").scrollTop = 0;
       if (existing) toast("なおしました");
     } catch {
       const er = w.querySelector("#rvErr"); er.textContent = "保存できませんでした。スマホの空き容量を確かめて、もう一度押してください。"; er.hidden = false;
