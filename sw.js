@@ -1,5 +1,5 @@
 // あさのフィルム: オフラインでも開けるように、アプリ本体だけを保存しておく
-const CACHE = "asa-film-v12";
+const CACHE = "asa-film-v13";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icon-180.png", "./icon-512.png"];
 
 self.addEventListener("install", e => {

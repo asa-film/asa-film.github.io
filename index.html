@@ -218,6 +218,9 @@ main{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-top:calc(va
 .moods button.on{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
 .chips{display:flex;flex-wrap:wrap;gap:6px}
 .chip{border:1px solid var(--line);border-radius:999px;padding:2px 10px;font-size:12px;background:var(--surface)}
+.save-photo{display:block;margin:8px auto 0;background:none;border:0;color:var(--ink);font-size:13px;font-weight:700;text-decoration:underline;text-underline-offset:3px;padding:6px 10px}
+.confirm .swap{display:flex;align-items:center;gap:10px}
+.confirm .swap img{width:46px;height:62px;object-fit:cover;border-radius:6px;flex:none}
 .confirm{background:var(--surface);border:1px solid var(--alert);border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:10px;font-size:13.5px}
 .actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
 .sticky-actions{position:sticky;bottom:calc(-22px - var(--sab));margin:0 calc(-1 * max(20px,var(--sar))) calc(-22px - var(--sab)) calc(-1 * max(20px,var(--sal)));padding:12px max(20px,var(--sar)) calc(14px + var(--sab)) max(20px,var(--sal));background:var(--paper);border-top:1px solid var(--line);z-index:2}
@@ -372,6 +375,17 @@ async function setKid(date, patch){
   S.days[date] = d; await put("days", d);
 }
 function addDays(dateStr, n){ const d = parse(dateStr); d.setDate(d.getDate() + n); return ymd(d); }
+// iPhoneの写真に保存：共有メニューを開き、「画像を保存」を選んでもらう（Webからは写真アプリへ直接書きこめないため）
+async function savePhotoToDevice(e){
+  const type = e.photo.type || "image/jpeg", ext = type.includes("png") ? "png" : "jpg";
+  const file = new File([e.photo], `asa-film-${e.date}.${ext}`, { type });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file] }); } catch (err) { if (err && err.name !== "AbortError") toast("保存できませんでした。もう一度押してください"); }
+    return;
+  }
+  const a = document.createElement("a"); a.href = URL.createObjectURL(file); a.download = file.name;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
 function toast(t){ const el = document.createElement("div"); el.className = "toast"; el.textContent = t; document.body.appendChild(el); setTimeout(() => el.remove(), 2200); }
 
 /* ---------- 気圧 ---------- */
@@ -624,7 +638,8 @@ function renderFilm(){
       ${S.justAdded && entryOf(S.justAdded) ? `<div class="added" role="status">
         <img src="${urlOf(entryOf(S.justAdded))}" alt="">
         <span class="t"><b>1コマ増えました</b>撮りはじめてから ${total}枚目の朝</span>
-        <button class="btn fill" type="button" id="addedNext">今日の気圧へ ›</button></div>` : ""}
+        <button class="btn fill" type="button" id="addedNext">今日の気圧へ ›</button></div>
+        <button type="button" class="save-photo" id="addedSave">この写真をiPhoneの写真にも保存する</button>` : ""}
     </div>
     <div class="strip"><div class="daystrip">${dayStrip}</div><div class="frames">${frames}</div></div>
     <div class="pad">
@@ -643,6 +658,7 @@ function renderFilm(){
   $("mPrev").onclick = () => { S.view.m--; if (S.view.m < 0){ S.view.m = 11; S.view.y--; } render(); };
   $("mNext").onclick = () => { S.view.m++; if (S.view.m > 11){ S.view.m = 0; S.view.y++; } render(); };
   $("wxChip").onclick = () => { S.justAdded = null; if (!S.settings.place) return openPlacePicker(); S.tab = "wx"; render(); fetchWx(); };
+  if ($("addedSave")) $("addedSave").onclick = () => savePhotoToDevice(entryOf(S.justAdded));
   if ($("addedNext")) $("addedNext").onclick = () => { S.justAdded = null; S.tab = "wx"; render(); $("main").scrollTop = 0; fetchWx(); };
 }
 
@@ -905,13 +921,24 @@ function openReview(blob, existing, presetDate){
     <div class="field"><label>その朝のきぶん</label><div class="moods" id="rvMoods">${moodButtons(mood)}</div></div>
     <div class="field"><label for="rvNote">娘のひとこと（なくてもOK）</label><input id="rvNote" maxlength="60" placeholder="例「きょう体育ある？」" value="${esc(existing?.note || "")}"></div>
     <p class="err" id="rvErr" hidden></p>
-    <div class="actions sticky-actions">${existing ? "" : `<button class="btn quiet" type="button" id="rvRetake">撮り直す</button>`}<button class="btn fill" type="button" id="rvSave">保存する</button></div>`);
+    <div class="confirm" id="rvConfirm" hidden><div class="swap"><img id="rvOldImg" alt="今入っている写真"><span>この日には、左の写真がもう入っています。入れかえると、左の写真は消えて元に戻せません。</span></div>
+      <div class="actions"><button class="btn quiet" type="button" id="rvNo">やめる</button><button class="btn danger" type="button" id="rvYes">入れかえる</button></div></div>
+    <div class="actions sticky-actions" id="rvActs">${existing ? "" : `<button class="btn quiet" type="button" id="rvRetake">撮り直す</button>`}<button class="btn fill" type="button" id="rvSave">保存する</button></div>`);
   const showPrev = () => { w.querySelector("#rvPrev").hidden = existing || !entryOf(date); };
   showPrev();
-  w.querySelector("#rvDate").onchange = e => { if (e.target.value && e.target.value <= todayStr()) date = e.target.value; else e.target.value = date; showPrev(); };
+  w.querySelector("#rvDate").onchange = e => { if (e.target.value && e.target.value <= todayStr()) date = e.target.value; else e.target.value = date; showPrev(); cf.hidden = true; acts.hidden = false; };
   w.querySelector("#rvMoods").onclick = e => { const b = e.target.closest("[data-mood]"); if (!b) return; mood = b.dataset.mood; w.querySelectorAll("[data-mood]").forEach(x => x.classList.toggle("on", x === b)); };
   if (w.querySelector("#rvRetake")) w.querySelector("#rvRetake").onclick = () => { w.remove(); URL.revokeObjectURL(url); openCamera(); };
-  w.querySelector("#rvSave").onclick = async () => {
+  const cf = w.querySelector("#rvConfirm"), acts = w.querySelector("#rvActs");
+  const askSwap = () => {
+    const old = entryOf(date);
+    w.querySelector("#rvOldImg").src = urlOf(old);
+    cf.hidden = false; acts.hidden = true; cf.scrollIntoView({ block: "nearest" });
+  };
+  w.querySelector("#rvNo").onclick = () => { cf.hidden = true; acts.hidden = false; };
+  w.querySelector("#rvYes").onclick = () => doSave();
+  w.querySelector("#rvSave").onclick = () => { if (!existing && entryOf(date)) askSwap(); else doSave(); };
+  const doSave = async () => {
     const rec = { date, photo: blob, mood, note: w.querySelector("#rvNote").value.trim(), createdAt: existing?.createdAt || Date.now() };
     try {
       await put("entries", rec);
@@ -967,7 +994,8 @@ function openDay(date){
   const w2 = sheet(`<div class="sheet-head"><h2 class="num">${d.getMonth()+1}月${d.getDate()}日（${WEEK[d.getDay()]}）${isToday ? "<span class=\"hint\" style=\"margin-left:8px\">今日</span>" : ""}</h2><button class="close" type="button" data-close>閉じる</button></div>
     ${e ? `<img class="photo-big" src="${urlOf(e)}" alt="${d.getMonth()+1}月${d.getDate()}日の顔">
       <div class="chips num">${mo ? `<span class="chip"><span class="dot" style="background:${mo.c};display:inline-block;margin-right:5px"></span>朝は${mo.t}</span>` : ""}</div>
-      ${e.note ? `<p class="quote" style="margin:0">「${esc(e.note)}」</p>` : ""}`
+      ${e.note ? `<p class="quote" style="margin:0">「${esc(e.note)}」</p>` : ""}
+      <button type="button" class="save-photo" id="dySave" style="margin-top:0">iPhoneの写真に保存する</button>`
       : `<button class="btn block" type="button" id="dyAddPhoto">この日の写真を入れる</button>`}
     <div class="field"><label>娘のようす</label>${evButtons(date)}</div>
     <div class="field"><label for="dyMemo">メモ（何時ごろ・どんな様子だったか など）</label>
@@ -983,6 +1011,7 @@ function openDay(date){
   w2.addEventListener("click", ev => { if (ev.target === w2 || ev.target.closest("[data-close]")) saveMemo(); }, true);
   if (w2.querySelector("#dyAddPhoto")) w2.querySelector("#dyAddPhoto").onclick = async () => { await saveMemo(); w2.remove(); S.pickDate = date; $("fileLib").click(); };
   if (!e) return;
+  w2.querySelector("#dySave").onclick = () => savePhotoToDevice(e);
   w2.querySelector("#dtEdit").onclick = async () => { await saveMemo(); w2.remove(); openReview(e.photo, e); };
   w2.querySelector("#dtDel").onclick = () => { w2.querySelector("#dtConfirm").hidden = false; w2.querySelector("#dtActs").hidden = true; };
   w2.querySelector("#dtNo").onclick = () => { w2.querySelector("#dtConfirm").hidden = true; w2.querySelector("#dtActs").hidden = false; };
